@@ -153,6 +153,7 @@ private:
 class TcamCamera
 {
     public:
+        TcamCamera() = delete;
         TcamCamera(std::string serial);
         ~TcamCamera();
 

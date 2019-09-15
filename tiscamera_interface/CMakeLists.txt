@@ -33,15 +33,14 @@ add_library(tiscamera_interface STATIC
 # Create Alias for better diagnosis messages
 add_library(tiscamera_interface::tiscamera_interface ALIAS tiscamera_interface)
 
+include_directories(include/tiscamera_interface)
+
 # include directories
 target_include_directories(tiscamera_interface
-  INTERFACE
+  PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${GSTREAMER_INCLUDE_DIRS}
-  PRIVATE
-    include/tiscamera_interface
-    ${GSTREAMER_INCLUDE_DIRS}
-    ${TCAM_INCLUDE_DIRS}
+    ${TCAMLIB_INCLUDE_DIRS}
 )
 
 # libraries

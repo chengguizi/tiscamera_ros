@@ -2,6 +2,11 @@
 #include <unistd.h>
 #include <chrono>
 
+#include <iostream>
+#include <cassert>
+
+#include "tiscamera_interface/tcam_statistics_meta.h"
+
 using namespace gsttcam;
 
 TcamImage::TcamImage(std::string serial) : TcamCamera(serial)
@@ -41,7 +46,7 @@ bool TcamImage::start()
 {
     // Register a callback to be called for each new frame
     set_new_frame_callback(new_frame_cb, &_CustomData);
-    if(_CustomData.image_data != NULL)
+    if(_CustomData.image_data != nullptr)
     {
         delete _CustomData.image_data;
     }
@@ -71,7 +76,7 @@ GstFlowReturn TcamImage::new_frame_cb(GstAppSink *appsink, gpointer data)
         return GST_FLOW_OK;
     std::lock_guard<std::mutex> lck(pCustomData->mtx);
 
-    pCustomData->SaveNextImage = false;
+    // pCustomData->SaveNextImage = false;
     pCustomData->ImageCounter++;
 
     // The following lines demonstrate, how to access the image
@@ -79,6 +84,71 @@ GstFlowReturn TcamImage::new_frame_cb(GstAppSink *appsink, gpointer data)
     GstSample *sample = gst_app_sink_pull_sample(appsink);
 
     GstBuffer *buffer = gst_sample_get_buffer(sample);
+
+    //// Obtain Metadata
+
+
+    const GstMetaInfo * meta_info = gst_meta_get_info("TcamStatisticsMeta");
+
+    if (meta_info != nullptr){
+        TcamStatisticsMeta *meta = (TcamStatisticsMeta *) gst_buffer_get_meta(buffer, meta_info->api);
+
+        // gint n_fields = gst_structure_n_fields(meta_tcam->structure);
+        // std::cout << "n_fields = " << n_fields << std::endl;
+
+        uint64_t frame_count;
+        if (gst_structure_get_uint64(meta->structure, "frame_count", &frame_count))
+            std::cout << "frame_count = " << frame_count << std::endl;
+
+        uint64_t frames_dropped;
+        if (gst_structure_get_uint64(meta->structure, "frames_dropped", &frames_dropped) && frames_dropped != 0)
+            std::cout << "frames_dropped = " << frames_dropped << std::endl;
+        
+    }
+
+        // gst_structure_set(struc,
+        //               "frame_count", G_TYPE_UINT64, statistics->frame_count,
+        //               "frames_dropped", G_TYPE_UINT64, statistics->frames_dropped,
+        //               "capture_time_ns", G_TYPE_UINT64, statistics->capture_time_ns,
+        //               "camera_time_ns", G_TYPE_UINT64, statistics->camera_time_ns,
+        //               "framerate", G_TYPE_DOUBLE, statistics->framerate,
+        //               "is_damaged", G_TYPE_BOOLEAN, statistics->is_damaged,
+        //               nullptr);
+
+    // FIRST TRY ///////////////////////////
+    // gpointer state = nullptr;
+    // GstMeta *meta;
+    // const GstMetaInfo *meta_info = TCAM_STATISTICS_META_INFO;
+    // while ((meta = gst_buffer_iterate_meta (buffer, &state))) {
+    //     // if (meta->info->api == meta_info->api) { // matched!
+    //     //     // TcamStatisticsMeta *tcam_meta = (TcamStatisticsMeta* )meta;
+
+    //     //     // gint n_fields = gst_structure_n_fields(tcam_meta->structure);
+    //     //     // std::cout << "n_fields = " << n_fields << std::endl;
+
+    //     // }
+
+    //      std::cout << "meta_count = "<< std::endl;
+
+    // }
+
+    /////////////////////////
+
+
+    // SECOND TRY ////////////
+    // TcamStatisticsMeta *meta;
+    // meta = gst_buffer_get_tcam_statistics_meta(buffer);
+
+    // if (meta != nullptr)
+    // {
+    //     gint n_fields = gst_structure_n_fields(meta->structure);
+    //     std::cout << "n_fields = " << n_fields << std::endl;
+    // }
+
+    ///////////////////////////
+    
+
+    // std::cout << "meta_count = " << meta_count << std::endl;
 
     GstMapInfo info;
 
@@ -90,6 +160,8 @@ GstFlowReturn TcamImage::new_frame_cb(GstAppSink *appsink, gpointer data)
         memcpy( pCustomData->image_data, info.data, pCustomData->width * pCustomData->height * pCustomData->bpp);
         //memcpy( pCustomData->image_data.data(), info.data, pCustomData->width * pCustomData->height * pCustomData->bpp);
     }
+
+
     
     // Calling Unref is important!
     gst_buffer_unmap (buffer, &info);

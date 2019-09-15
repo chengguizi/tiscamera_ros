@@ -56,14 +56,14 @@ int main(int argc, char **argv)
     // Start the camera
     cam.start();
 
-    sleep(1);
+    // sleep(1);
     printf("Start Snap\n");
 
     std::cout  << " cam.getBytesPerPixel() = " << cam.getBytesPerPixel() << std::endl;
 
     // Snap an Image with 60 ms timeout. Should be set accordingly to the
     // frame rate.
-    if( cam.snapImage(60) )
+    if( cam.snapImage(500) )
     {
         // On succes do something with the image data. Here we create
         // a cv::Mat and save the image
