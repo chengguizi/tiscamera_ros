@@ -10,6 +10,7 @@
 class TcamImage : public gsttcam::TcamCamera
 {
     public:
+        // TcamImage() = delete;
         TcamImage(std::string serial = "");
         ~TcamImage();
         void set_capture_format(std::string format, gsttcam::FrameSize size, gsttcam::FrameRate framerate);

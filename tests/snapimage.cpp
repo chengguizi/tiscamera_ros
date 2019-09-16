@@ -41,17 +41,21 @@ int main(int argc, char **argv)
     cv::Mat OpenCVImage;
     // Initialize our TcamCamera object "cam" with the serial number
     // of the camera, which is to be used in this program.
-    TcamImage cam("30914056");
+    TcamImage cam;
+    // TcamImage cam("30914056");
     //TcamCamera cam("00001234");
 
     ListProperties(cam);
-    
-    // Set a color video format, resolution and frame rate
-    cam.set_capture_format("GRAY16_LE", FrameSize{1440,1080}, FrameRate{30,1});
-
 
     // Comment following line, if no live video display is wanted.
     cam.enable_video_display(gst_element_factory_make("ximagesink", NULL));
+    
+    // Set a color video format, resolution and frame rate
+    cam.set_capture_format("GRAY16_LE", FrameSize{640,480}, FrameRate{30,1});
+
+
+    // sleep(1);
+    // return 0;
     
     // Start the camera
     cam.start();
@@ -67,14 +71,16 @@ int main(int argc, char **argv)
     {
         // On succes do something with the image data. Here we create
         // a cv::Mat and save the image
-        OpenCVImage.create( cam.getHeight(),cam.getWidth(),CV_16UC1);
-        memcpy( OpenCVImage.data, cam.getImageData(), cam.getImageDataSize());
-        cv::imwrite("test.png",OpenCVImage);
+        // OpenCVImage.create( cam.getHeight(),cam.getWidth(),CV_16UC1);
+        // memcpy( OpenCVImage.data, cam.getImageData(), cam.getImageDataSize());
+        // cv::imwrite("test.png",OpenCVImage);
     }
     else
     {
         printf("Timeout at snapImage()\n");
     }
+    sleep(3);
+    cam.set_capture_format("GRAY16_LE", FrameSize{1440,1080}, FrameRate{30,1});
 
     printf("Press enter key to end program.");
     // Simple implementation of "getch()", wait for enter key.

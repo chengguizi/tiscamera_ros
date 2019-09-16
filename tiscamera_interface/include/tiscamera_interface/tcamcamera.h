@@ -228,6 +228,7 @@ class TcamCamera
         void disable_video_display();
 
     private:
+        bool is_playing = false;
         GstElement *pipeline_ = nullptr;
         GstElement *tcambin_ = nullptr;
         GstElement *capturecapsfilter_ = nullptr;

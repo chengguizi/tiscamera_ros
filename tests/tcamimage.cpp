@@ -157,8 +157,8 @@ GstFlowReturn TcamImage::new_frame_cb(GstAppSink *appsink, gpointer data)
     if (info.data != NULL) 
     {
         // info.data contains the image data as blob of unsigned char 
-        memcpy( pCustomData->image_data, info.data, pCustomData->width * pCustomData->height * pCustomData->bpp);
-        //memcpy( pCustomData->image_data.data(), info.data, pCustomData->width * pCustomData->height * pCustomData->bpp);
+        // memcpy( pCustomData->image_data, info.data, pCustomData->width * pCustomData->height * pCustomData->bpp);
+        ////memcpy( pCustomData->image_data.data(), info.data, pCustomData->width * pCustomData->height * pCustomData->bpp);
     }
 
 

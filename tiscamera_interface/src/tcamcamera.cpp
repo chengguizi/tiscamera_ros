@@ -546,6 +546,10 @@ TcamCamera::set_property(std::string name, GValue &value)
 void
 TcamCamera::set_capture_format(std::string format, FrameSize size, FrameRate framerate)
 {
+
+    GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN(pipeline_),
+                              GST_DEBUG_GRAPH_SHOW_ALL, "pipeline-pre");
+
     GstCaps *caps = gst_caps_new_simple("video/x-raw",
                                         "width", G_TYPE_INT, size.width,
                                         "height", G_TYPE_INT, size.height,
@@ -553,10 +557,30 @@ TcamCamera::set_capture_format(std::string format, FrameSize size, FrameRate fra
                                         nullptr);
     assert(caps);
     if(format != "")
-        gst_caps_set_simple(caps, "format", G_TYPE_STRING, format.c_str(), nullptr);
+        gst_caps_set_simple(caps, "format", G_TYPE_STRING, format.c_str(), nullptr);    
 
-    g_object_set(G_OBJECT(capturecapsfilter_), "caps", caps, nullptr);
+    if(!is_playing)
+    {
+        g_object_set(tcambin_, "device-caps", gst_caps_to_string(caps), nullptr);
+    }
+    else
+    {
+        GstElement *src = gst_bin_get_by_name(GST_BIN(tcambin_), "tcambin-src_caps");
+        assert(src);
+        g_object_set(src, "caps", caps, nullptr);
+        gst_object_unref(src);
+    }
+    
+
+    //// not working: device-caps is only queried upon GST_STATE_CHANGE_READY_TO_PAUSED
+    // g_object_set(tcambin_, "device-caps", gst_caps_to_string(caps), nullptr);
+    
+    // this change is not working for changing resolution
+    // g_object_set(G_OBJECT(capturecapsfilter_), "caps", caps, nullptr);
     gst_caps_unref(caps);
+
+    GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN(pipeline_),
+                              GST_DEBUG_GRAPH_SHOW_ALL, "pipeline-post");
 }
 
 bool
@@ -566,6 +590,8 @@ TcamCamera::start()
     gst_element_get_state(pipeline_, NULL, NULL, GST_CLOCK_TIME_NONE);
     GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN(pipeline_),
                               GST_DEBUG_GRAPH_SHOW_ALL, "pipeline");
+
+    is_playing = true;
     return TRUE;
 }
 
@@ -574,6 +600,9 @@ TcamCamera::stop()
 {
     gst_element_set_state(pipeline_, GST_STATE_NULL);
     gst_element_get_state(pipeline_, NULL, NULL, GST_CLOCK_TIME_NONE);
+
+    is_playing = false;
+
     return TRUE;
 }
 
@@ -593,8 +622,9 @@ TcamCamera::set_new_frame_callback(std::function<GstFlowReturn(GstAppSink *appsi
                                    gpointer data)
 {
     callback_ = callback;
-    callback_data_ = data;
-    GstAppSinkCallbacks callbacks = {nullptr, nullptr, new_frame_callback, nullptr};
+    callback_data_ = data; // this pointer is not modified, and passed back to the callback directly
+    // set up callbacks for eos(), new_preroll(), new_sample(). Only new sample callback is activated
+    GstAppSinkCallbacks callbacks = {nullptr, nullptr, new_frame_callback, nullptr}; // the last nullptr is for initialisation of the reserved padding
     gst_app_sink_set_callbacks(GST_APP_SINK(capturesink_), &callbacks, this, nullptr);
 }
 
