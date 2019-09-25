@@ -21,3 +21,32 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
 add_subdirectory(tiscamera_interface)
 add_subdirectory(tests)
+
+find_package(Threads REQUIRED)
+
+find_package(catkin REQUIRED COMPONENTS
+  roscpp
+  tiscamera_ros
+)
+
+catkin_package(
+  # INCLUDE_DIRS 
+  # LIBRARIES 
+  CATKIN_DEPENDS imu_vn_100
+  # DEPENDS
+)
+
+# message ("catkin_INCLUDE_DIRS = ${catkin_INCLUDE_DIRS}")
+# message ("catkin_LIBRARIES = ${catkin_LIBRARIES}")
+
+add_executable(tiscamera_ros main.cpp)
+target_include_directories(tiscamera_ros
+  PRIVATE
+  include
+  ${catkin_INCLUDE_DIRS}
+)
+target_link_libraries(tiscamera_ros
+  ${catkin_LIBRARIES}
+  tiscamera_interface::tiscamera_interface
+  Threads::Threads
+)

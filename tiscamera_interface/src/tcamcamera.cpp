@@ -260,6 +260,7 @@ BooleanProperty::set(TcamCamera &cam, int value)
 
 TcamCamera::TcamCamera(std::string serial = "")
 {
+    pipeline_name = "pipeline" + serial;
     if (!gst_is_initialized())
         throw std::runtime_error("GStreamer is not initialized! gst_init(...) needs to be called before using this function.");
     create_pipeline();
@@ -283,7 +284,8 @@ TcamCamera::~TcamCamera()
 void
 TcamCamera::create_pipeline()
 {
-    pipeline_ = gst_pipeline_new("pipeline");
+    pipeline_ = gst_pipeline_new(pipeline_name.c_str());
+    std::cout << "pipeline created with name: " << pipeline_name << std::endl;
     tcambin_ = gst_element_factory_make("tcambin", nullptr);
     if (!tcambin_)
         throw std::runtime_error("'tcambin' could not be initialized! Check tiscamera installation");
@@ -589,7 +591,7 @@ TcamCamera::start()
     gst_element_set_state(pipeline_, GST_STATE_PLAYING);
     gst_element_get_state(pipeline_, NULL, NULL, GST_CLOCK_TIME_NONE);
     GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN(pipeline_),
-                              GST_DEBUG_GRAPH_SHOW_ALL, "pipeline");
+                              GST_DEBUG_GRAPH_SHOW_ALL, pipeline_name.c_str());
 
     is_playing = true;
     return TRUE;
@@ -606,6 +608,8 @@ TcamCamera::stop()
     return TRUE;
 }
 
+// This a "pointer-to-member" operator, bounce function to reinterpret the data parameter as the pointer to the class object.
+// This is supposed to call the right class object's member function
 GstFlowReturn
 TcamCamera::new_frame_callback(GstAppSink *appsink, gpointer data)
 {

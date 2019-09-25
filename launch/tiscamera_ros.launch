@@ -1,0 +1,3 @@
+<launch>
+    <node  pkg="tiscamera_ros" name="tiscamera_ros" type="tiscamera_ros" output="screen"></node>
+</launch>
