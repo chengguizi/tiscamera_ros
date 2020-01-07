@@ -1,0 +1,15 @@
+devices:
+  - fisheye_left
+  - fisheye_right
+
+fisheye_left:
+  type: 37UX273-ML
+  sn: '30914056'
+  exposure_mode: manual
+  hardware_sync_mode: none
+
+fisheye_right:
+  type: 37UX273-ML
+  sn: '30914060'
+  exposure_mode: manual
+  hardware_sync_mode: none

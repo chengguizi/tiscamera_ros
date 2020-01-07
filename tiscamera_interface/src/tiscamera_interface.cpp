@@ -24,6 +24,8 @@ TisCameraManager::TisCameraManager(const std::string topic_ns, const std::string
     frame.data.image_data = nullptr;
 
     prop_trigger_mode = get_property("Trigger Mode");
+
+    std::cout << "Tiscamera initialised" << std::endl;
 }
 
 TisCameraManager::~TisCameraManager()
@@ -32,6 +34,8 @@ TisCameraManager::~TisCameraManager()
     // make sure all threads are shutdown, mutex released
     if(frame.data.image_data)
         delete frame.data.image_data;
+
+    std::cout << "Tiscamera Destructor()" << std::endl;
 }
 
 bool TisCameraManager::set_trigger_mode(TisCameraManager::TriggerMode value)
@@ -177,7 +181,7 @@ GstFlowReturn TisCameraManager::setFrame(GstAppSink *appsink, gpointer data)
         gst_buffer_unmap (buffer, &info);
         gst_sample_unref(sample);
 
-        std::cout << frame.data.capture_time_ns << " " << frame.data.topic_ns << " frame " << frame.data.frame_count << std::endl;
+        std::cout << frame.data.topic_ns << " " << frame.data.capture_time_ns  << " frame " << frame.data.frame_count << std::endl;
 
         if (_cblist_camera.size())
         {

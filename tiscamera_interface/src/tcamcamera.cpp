@@ -260,7 +260,7 @@ BooleanProperty::set(TcamCamera &cam, int value)
 
 TcamCamera::TcamCamera(std::string serial = "")
 {
-    pipeline_name = "pipeline" + serial;
+    pipeline_name = "pipeline_" + serial;
     if (!gst_is_initialized())
         throw std::runtime_error("GStreamer is not initialized! gst_init(...) needs to be called before using this function.");
     create_pipeline();
@@ -273,6 +273,8 @@ TcamCamera::TcamCamera(std::string serial = "")
     gst_object_unref(src);
 
     videocaps_ = initialize_format_list();
+
+    std::cout << pipeline_name << " initialised!" << std::endl;
 }
 
 TcamCamera::~TcamCamera()

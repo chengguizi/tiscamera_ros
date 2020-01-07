@@ -24,9 +24,13 @@ add_subdirectory(tests)
 
 find_package(Threads REQUIRED)
 
+find_package(OpenCV 3 REQUIRED)
+
 find_package(catkin REQUIRED COMPONENTS
   roscpp
-  tiscamera_ros
+  image_transport
+  cv_bridge
+  imu_vn_100
 )
 
 catkin_package(
@@ -39,7 +43,7 @@ catkin_package(
 # message ("catkin_INCLUDE_DIRS = ${catkin_INCLUDE_DIRS}")
 # message ("catkin_LIBRARIES = ${catkin_LIBRARIES}")
 
-add_executable(tiscamera_ros main.cpp)
+add_executable(tiscamera_ros main.cpp ros_publisher.cpp)
 target_include_directories(tiscamera_ros
   PRIVATE
   include
@@ -47,6 +51,7 @@ target_include_directories(tiscamera_ros
 )
 target_link_libraries(tiscamera_ros
   ${catkin_LIBRARIES}
+  ${OpenCV_LIBRARIES}
   tiscamera_interface::tiscamera_interface
   Threads::Threads
 )

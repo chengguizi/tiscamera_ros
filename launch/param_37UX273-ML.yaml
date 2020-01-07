@@ -1,0 +1,13 @@
+# Configurations for The Imaging Source Board Camera
+# Tiscamera on Linux
+# DMM 37UX273-ML
+
+width: 1440
+height: 1080
+frame_rate: 50
+gst_frame_rate: 60 # should be heigher than frame_rate
+format: GRAY16_LE
+
+
+initial_exposure: 10000 # us
+initial_gain: 0 # range

@@ -157,19 +157,24 @@ class TcamCamera
         TcamCamera(std::string serial);
         ~TcamCamera();
 
-		TcamCamera( TcamCamera& ) = delete;
+        // copy constructor
+		TcamCamera( const TcamCamera& ) = delete;
+        // move constructor
 		TcamCamera( TcamCamera&& other )
 			: pipeline_ { other.pipeline_ }
 		{
 			other.pipeline_ = nullptr;
 		};
 
+        // copy assignment
 		TcamCamera& operator= ( const TcamCamera& ) = delete;
+        // move assignment
 		TcamCamera& operator= ( TcamCamera&& other)
 		{
             if (this != &other)
             {
-                gst_object_unref( pipeline_ );
+                if (pipeline_)
+                    gst_object_unref( pipeline_ );
 			    pipeline_ = other.pipeline_;
 			    other.pipeline_ = nullptr;
             }
