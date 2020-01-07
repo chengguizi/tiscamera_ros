@@ -2,5 +2,6 @@
     <node  pkg="tiscamera_ros" name="tiscamera_ros" type="tiscamera_ros" output="screen">
         <rosparam file="$(find tiscamera_ros)/launch/device_list.yaml"/>
         <rosparam file="$(find tiscamera_ros)/launch/param_37UX273-ML.yaml"/>
+        <rosparam file="$(find tiscamera_ros)/launch/camchain.yaml"/>
     </node>
 </launch>

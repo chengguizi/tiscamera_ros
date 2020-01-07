@@ -43,7 +43,7 @@ catkin_package(
 # message ("catkin_INCLUDE_DIRS = ${catkin_INCLUDE_DIRS}")
 # message ("catkin_LIBRARIES = ${catkin_LIBRARIES}")
 
-add_executable(tiscamera_ros main.cpp ros_publisher.cpp)
+add_executable(tiscamera_ros main.cpp ros_publisher.cpp utils.cpp)
 target_include_directories(tiscamera_ros
   PRIVATE
   include
