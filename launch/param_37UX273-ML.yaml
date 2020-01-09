@@ -10,4 +10,4 @@ format: GRAY16_LE
 
 
 initial_exposure: 10000 # us
-initial_gain: 0 # range
+initial_gain: 1 # range

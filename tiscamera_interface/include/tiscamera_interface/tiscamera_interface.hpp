@@ -50,6 +50,9 @@ class TisCameraManager : public gsttcam::TcamCamera
         ~TisCameraManager();
 
         bool set_trigger_mode(TriggerMode value);
+        bool set_exposure_gain_auto(bool value);
+        bool set_exposure_time(int value);
+        bool set_gain(int value);
         bool set_low_latency_mode(bool value);
 
         void set_capture_format(std::string format, gsttcam::FrameSize size, gsttcam::FrameRate framerate);
@@ -74,6 +77,10 @@ class TisCameraManager : public gsttcam::TcamCamera
 
         // properties
         std::shared_ptr<gsttcam::Property> prop_trigger_mode;
+        std::shared_ptr<gsttcam::Property> prop_exposure_mode;
+        std::shared_ptr<gsttcam::Property> prop_gain_mode;
+        std::shared_ptr<gsttcam::Property> prop_exposure_time;
+        std::shared_ptr<gsttcam::Property> prop_gain;
 
         std::vector<callbackCamera> _cblist_camera;
 

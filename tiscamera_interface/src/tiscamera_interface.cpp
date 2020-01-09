@@ -24,6 +24,10 @@ TisCameraManager::TisCameraManager(const std::string topic_ns, const std::string
     frame.data.image_data = nullptr;
 
     prop_trigger_mode = get_property("Trigger Mode");
+    prop_exposure_mode = get_property("Exposure Auto");
+    prop_exposure_time = get_property("Exposure Time (us)");
+    prop_gain_mode = get_property("Gain Auto");
+    prop_gain = get_property("Gain");
 
     std::cout << "Tiscamera initialised" << std::endl;
 }
@@ -67,13 +71,48 @@ bool TisCameraManager::set_trigger_mode(TisCameraManager::TriggerMode value)
     }
     catch(std::exception &ex)    
     {
-        printf("Error %s : %s\n",ex.what(), "Exposure Value");
+        printf("Error %s : %s\n",ex.what(), "Trigger Mode");
         return false;
     }
 
     std::cout  << prop_trigger_mode->to_string() << std::endl;
 
     return false;
+}
+
+bool TisCameraManager::set_exposure_gain_auto(bool value)
+{
+    std::cout << "setting exposure & gain mode to " << value << std::endl;
+
+    if (!prop_exposure_mode->set((*this), value))
+    {
+        throw std::runtime_error("set exposure mode FAILED");
+    }
+
+    if (!prop_gain_mode->set((*this), value))
+    {
+        throw std::runtime_error("set gain mode FAILED");
+    }
+}
+
+bool TisCameraManager::set_exposure_time(int value)
+{
+    std::cout << "setting exposure time to " << value << std::endl;
+
+    if (!prop_exposure_time->set((*this), value))
+    {
+        throw std::runtime_error("set exposure time FAILED");
+    }
+}
+
+bool TisCameraManager::set_gain(int value)
+{
+    std::cout << "setting gain to " << value << std::endl;
+
+    if (!prop_gain->set((*this), value))
+    {
+        throw std::runtime_error("set gain FAILED");
+    }
 }
 
 void TisCameraManager::set_capture_format(std::string format, FrameSize size, FrameRate framerate)

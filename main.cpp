@@ -32,6 +32,7 @@ unsigned char MASK = 0;
 StereoCameraPublisher* _pub;
 IMUPublisher* _pub_imu;
 sensor_msgs::CameraInfo left_info, right_info;
+int initial_exposure, initial_gain;
 
 // template <class TimuData, class TcameraData, int Ncamera>
 void callbackSynced_handler(CameraIMUSyncN::MetaFrame frame)
@@ -106,6 +107,12 @@ void loadParameters(const ros::NodeHandle &nh)
     right_info.P[9] = T_cam0_cam1.at<double>(2, 1);
     right_info.P[10] = T_cam0_cam1.at<double>(2, 2);
     right_info.P[11] = T_cam0_cam1.at<double>(2, 3);
+
+
+    nh.getParam("initial_exposure", initial_exposure);
+    nh.getParam("initial_gain", initial_gain);
+    std::cout << "initial_exposure = " << initial_exposure << std::endl;
+    std::cout << "initial_gain = " << initial_gain << std::endl;
 }
 
 
@@ -174,6 +181,11 @@ int main(int argc, char **argv)
             // camera->enable_video_display(gst_element_factory_make("ximagesink", NULL));
             std::cout << "Setting Capture Format..." << std::endl;
             camera->set_capture_format("GRAY16_LE", gsttcam::FrameSize{1440,1080}, gsttcam::FrameRate{60,1}); // {1440,1080}
+            
+            camera->set_exposure_gain_auto(false);
+            camera->set_exposure_time(initial_exposure); // in us
+            camera->set_gain(initial_gain);
+
             camera->set_trigger_mode(TisCameraManager::NONE); // prior to start, the camera has to be non-triggering mode
             camera->start();
             ROS_INFO_STREAM("Camera " << camera_ns << " Started...");
