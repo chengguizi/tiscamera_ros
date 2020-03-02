@@ -12,6 +12,7 @@
 #include <iostream>
 
 #include <cassert>
+#include <cstring>
 
 using namespace gsttcam;
 
@@ -93,6 +94,8 @@ bool TisCameraManager::set_exposure_gain_auto(bool value)
     {
         throw std::runtime_error("set gain mode FAILED");
     }
+
+    return true;
 }
 
 bool TisCameraManager::set_exposure_time(int value)
@@ -103,6 +106,7 @@ bool TisCameraManager::set_exposure_time(int value)
     {
         throw std::runtime_error("set exposure time FAILED");
     }
+    return true;
 }
 
 bool TisCameraManager::set_gain(int value)
@@ -113,6 +117,7 @@ bool TisCameraManager::set_gain(int value)
     {
         throw std::runtime_error("set gain FAILED");
     }
+    return true;
 }
 
 void TisCameraManager::set_capture_format(std::string format, FrameSize size, FrameRate framerate)
@@ -214,7 +219,7 @@ GstFlowReturn TisCameraManager::setFrame(GstAppSink *appsink, gpointer data)
             frame.data.image_data = new unsigned char[info.size];
         }
 
-        memcpy(frame.data.image_data, info.data, frame.data.width * frame.data.height * frame.data.bytes_per_pixel);
+        std::memcpy(frame.data.image_data, info.data, frame.data.width * frame.data.height * frame.data.bytes_per_pixel);
         
         // Calling Unref is important!
         gst_buffer_unmap (buffer, &info);

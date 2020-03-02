@@ -24,6 +24,8 @@
 #include "ros_publisher.hpp"
 #include "utils.hpp"
 
+#include "camera_param.hpp"
+
 using namespace std;
 typedef CameraIMUSync<VnDeviceCompositeData, TisCameraManager::FrameData, 2> CameraIMUSyncN;
 unsigned char MASK = 0;
@@ -32,7 +34,8 @@ unsigned char MASK = 0;
 StereoCameraPublisher* _pub;
 IMUPublisher* _pub_imu;
 sensor_msgs::CameraInfo left_info, right_info;
-int initial_exposure, initial_gain;
+
+std::vector<std::string> CameraParam::camera_list;
 
 // template <class TimuData, class TcameraData, int Ncamera>
 void callbackSynced_handler(CameraIMUSyncN::MetaFrame frame)
@@ -54,7 +57,18 @@ void callbackSynced_handler(CameraIMUSyncN::MetaFrame frame)
     return;
 }
 
-void loadParameters(const ros::NodeHandle &nh)
+
+
+// void loadParam(const std::string& topic_ns)
+// {
+//     ros::NodeHandle nh_local("~/" + topic_ns);
+//     nh_local.getParam("initial_exposure", initial_exposure);
+//     nh_local.getParam("initial_gain", initial_gain);
+//     std::cout << "initial_exposure = " << initial_exposure << std::endl;
+//     std::cout << "initial_gain = " << initial_gain << std::endl;
+// }
+
+void loadCalibration(const ros::NodeHandle &nh)
 {
     // uint32 height
     // uint32 width
@@ -107,12 +121,6 @@ void loadParameters(const ros::NodeHandle &nh)
     right_info.P[9] = T_cam0_cam1.at<double>(2, 1);
     right_info.P[10] = T_cam0_cam1.at<double>(2, 2);
     right_info.P[11] = T_cam0_cam1.at<double>(2, 3);
-
-
-    nh.getParam("initial_exposure", initial_exposure);
-    nh.getParam("initial_gain", initial_gain);
-    std::cout << "initial_exposure = " << initial_exposure << std::endl;
-    std::cout << "initial_gain = " << initial_gain << std::endl;
 }
 
 
@@ -120,9 +128,12 @@ int main(int argc, char **argv)
 {
     ros::init(argc, argv, "tiscamera_ros");
     ros::NodeHandle nh_local("~");
-    loadParameters(nh_local);
-    // Initialise publishers
 
+    // Loading ROS Paramters
+    loadCalibration(ros::NodeHandle("~/calibration")); //  write to left_info, right_info
+
+
+    // Initialise publishers
     _pub = new StereoCameraPublisher(nh_local);
     _pub_imu = new IMUPublisher(nh_local);
 
@@ -130,14 +141,14 @@ int main(int argc, char **argv)
 
     std::vector<std::unique_ptr<TisCameraManager>> camera_list;
 
-    std::vector<std::string> camera_ns_list;
-
-    camera_ns_list.push_back("30914056"); // left
-    camera_ns_list.push_back("30914060"); // right
+    // camera_ns_list.push_back("30914056"); // left
+    // camera_ns_list.push_back("30914060"); // right
 
 
     // sync struct
-    constexpr int RATE = 4; // should be divisible by 800
+    int RATE;
+    nh_local.getParam("sync_rate", RATE);
+    // constexpr int RATE = 4; // should be divisible by 800
     
     CameraIMUSyncN cameraImuSync;
     cameraImuSync.set_max_slack(1.0/RATE * 0.8); // maximum slack to be 80% of the duration
@@ -147,7 +158,7 @@ int main(int argc, char **argv)
     gst_init(&argc, &argv);
 
     try {
-        nh_local.setParam("sync_rate", RATE);
+        // nh_local.setParam("sync_rate", RATE);
         imu_vn_100::ImuVn100 imu(nh_local);
         imu.Stream(true);
         imu.registerCallback(std::bind(&CameraIMUSyncN::push_backIMU, &cameraImuSync, std::placeholders::_1));
@@ -156,16 +167,21 @@ int main(int argc, char **argv)
 
         auto available_devices = gsttcam::get_device_list();
 
+        std::vector<std::string> camera_ns_list = CameraParam::loadCameras(nh_local);
         const int N = camera_ns_list.size();
+        assert(N == 2); // ONLY STEREO FOR NOW
 
-        
-
-        for (int i = 0; i < N ; i++)
+        size_t i = 0;
+        for (auto &camera_ns : camera_ns_list)
         {
-            auto& camera_ns = camera_ns_list[i];
+            CameraParam param;
+            param.loadParam(camera_ns);
+            param.loadExposureControlParam(param.type);
+
+            auto& sn = param.camera_sn;
             // Skip non-existent cameras
             if (
-                available_devices.end() == std::find_if(available_devices.begin(), available_devices.end(), [&camera_ns](gsttcam::CameraInfo& device){ return camera_ns == device.serial;})
+                available_devices.end() == std::find_if(available_devices.begin(), available_devices.end(), [&sn](gsttcam::CameraInfo& device){ return sn == device.serial;})
             )
             {
                 ROS_WARN_STREAM(camera_ns << "is not detected, skipping");
@@ -174,29 +190,40 @@ int main(int argc, char **argv)
                 continue;
             }
 
-            std::unique_ptr<TisCameraManager> camera(new TisCameraManager ("tiscam" + std::to_string(i), camera_ns));
+            std::unique_ptr<TisCameraManager> camera(new TisCameraManager (camera_ns, sn));
             // todo: check for successful initialisation
             
             // std::cout << "Enable Display" << std::endl;
             // camera->enable_video_display(gst_element_factory_make("ximagesink", NULL));
             std::cout << "Setting Capture Format..." << std::endl;
-            camera->set_capture_format("GRAY16_LE", gsttcam::FrameSize{1440,1080}, gsttcam::FrameRate{60,1}); // {1440,1080}
+            camera->set_capture_format("GRAY16_LE", gsttcam::FrameSize{param.width,param.height}, gsttcam::FrameRate{param.gst_frame_rate,1}); // {1440,1080}
             
-            camera->set_exposure_gain_auto(false);
-            camera->set_exposure_time(initial_exposure); // in us
-            camera->set_gain(initial_gain);
-
-            camera->set_trigger_mode(TisCameraManager::NONE); // prior to start, the camera has to be non-triggering mode
-            camera->start();
-            ROS_INFO_STREAM("Camera " << camera_ns << " Started...");
-            camera->set_trigger_mode(TisCameraManager::TRIGGER_RISING_EDGE);
-
+            if (param.exposure_mode == "manual")
+                camera->set_exposure_gain_auto(false);
+            else
+                camera->set_exposure_gain_auto(true);
             
+            camera->set_exposure_time(param.initial_exposure); // in us
+            camera->set_gain(param.initial_gain);
+
+            if (param.hardware_sync_mode == "none")
+            {
+                camera->set_trigger_mode(TisCameraManager::NONE); // prior to start, the camera has to be non-triggering mode
+                camera->start();
+            }else if (param.hardware_sync_mode == "slave"){
+                
+                camera->set_trigger_mode(TisCameraManager::NONE); // prior to start, the camera has to be non-triggering mode
+                camera->start();
+                std::cout << "Camera " << camera_ns << " Hardware Sync ENABLED" << std::endl;
+                camera->set_trigger_mode(TisCameraManager::TRIGGER_RISING_EDGE);
+            }
+
+            ROS_INFO_STREAM("Camera " << camera_ns << " Started...");            
 
             camera_list.push_back(std::move(camera));
 
             MASK |= 1<<i;
-
+            i++;
         }
 
         // std::cout  << " MASK=" << (int)MASK << std::endl;
@@ -207,7 +234,7 @@ int main(int argc, char **argv)
 
         ros::Duration(0.5).sleep();
 
-        std::size_t i = 0;
+        i = 0;
         for (auto& camera : camera_list){
             if (camera != nullptr)
                 camera->registerCallback(std::bind(&CameraIMUSyncN::push_backCamera, &cameraImuSync, std::placeholders::_1, i));
