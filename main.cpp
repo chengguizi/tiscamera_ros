@@ -152,7 +152,7 @@ int main(int argc, char **argv)
     
     CameraIMUSyncN cameraImuSync;
     cameraImuSync.set_max_slack(1.0/RATE * 0.8); // maximum slack to be 80% of the duration
-    cameraImuSync.set_imu_read_jitter(0.002); // 2ms jitter allowed
+    cameraImuSync.set_imu_read_jitter(std::max(1.0/RATE * 0.1, 0.008)); // 8ms jitter allowed
 
     // GStreamer must be initialised before any camera usage
     gst_init(&argc, &argv);
@@ -196,7 +196,7 @@ int main(int argc, char **argv)
             // std::cout << "Enable Display" << std::endl;
             // camera->enable_video_display(gst_element_factory_make("ximagesink", NULL));
             std::cout << "Setting Capture Format..." << std::endl;
-            camera->set_capture_format("GRAY16_LE", gsttcam::FrameSize{param.width,param.height}, gsttcam::FrameRate{param.gst_frame_rate,1}); // {1440,1080}
+            camera->set_capture_format("GRAY16_LE", gsttcam::FrameSize{param.width,param.height}, gsttcam::FrameRate{param.gst_max_frame_rate,1}); // {1440,1080}
             
             if (param.exposure_mode == "manual")
                 camera->set_exposure_gain_auto(false);

@@ -16,7 +16,7 @@ public:
     std::string hardware_sync_mode = "none";
 
     // type param
-    int width = 0,height = 0,hz = 0, gst_frame_rate = 0;
+    int width = 0,height = 0, gst_max_frame_rate = 0;
     std::string exposure_mode = "auto";
     std::string format = "GRAY16_LE";
 
@@ -54,8 +54,7 @@ void CameraParam::loadParam(const std::string& topic_ns)
     ros::NodeHandle nh_type("~/" + type);
     nh_type.getParam("width",width);
     nh_type.getParam("height",height);
-    nh_type.getParam("frame_rate",hz);
-    nh_type.getParam("gst_frame_rate",gst_frame_rate);
+    nh_type.getParam("gst_max_frame_rate",gst_max_frame_rate);
     nh_type.getParam("format",format);
 }
 

@@ -4,10 +4,9 @@
 
 width: 1440
 height: 1080
-frame_rate: 50
-gst_frame_rate: 60 # should be heigher than frame_rate
+gst_max_frame_rate: 30 # should be heigher than actual sync_rate
 format: GRAY16_LE
 
 
-initial_exposure: 10000 # us
-initial_gain: 16 # range from 0 to 480
+initial_exposure: 1000 # us
+initial_gain: 0 # range from 0 to 480
