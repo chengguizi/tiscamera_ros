@@ -8,5 +8,5 @@ gst_max_frame_rate: 30 # should be heigher than actual sync_rate
 format: GRAY16_LE
 
 
-initial_exposure: 1000 # us
+initial_exposure: 18000 # us
 initial_gain: 0 # range from 0 to 480

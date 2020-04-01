@@ -199,12 +199,20 @@ int main(int argc, char **argv)
             camera->set_capture_format("GRAY16_LE", gsttcam::FrameSize{param.width,param.height}, gsttcam::FrameRate{param.gst_max_frame_rate,1}); // {1440,1080}
             
             if (param.exposure_mode == "manual")
+            {
+                std::cout << "Setting Exposure Mode Manual" << std::endl;
                 camera->set_exposure_gain_auto(false);
+                camera->set_exposure_time(param.initial_exposure); // in us
+                camera->set_gain(param.initial_gain);
+            }
             else
+            {
+                std::cout << "Setting Exposure Mode Auto" << std::endl;
                 camera->set_exposure_gain_auto(true);
+            }
+                
             
-            camera->set_exposure_time(param.initial_exposure); // in us
-            camera->set_gain(param.initial_gain);
+            
 
             if (param.hardware_sync_mode == "none")
             {

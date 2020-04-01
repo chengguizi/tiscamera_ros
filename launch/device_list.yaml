@@ -5,11 +5,11 @@ devices:
 fisheye_left:
   type: 37UX273_ML
   sn: '30914056'
-  exposure_mode: manual
+  exposure_mode: auto
   hardware_sync_mode: slave
 
 fisheye_right:
   type: 37UX273_ML
   sn: '30914060'
-  exposure_mode: manual
+  exposure_mode: auto
   hardware_sync_mode: slave
