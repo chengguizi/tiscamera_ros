@@ -15,9 +15,21 @@ endif()
 
 message(STATUS "CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
 
+
+set(WITH_TONEMAPPING_FLAG ON)
+
+if(WITH_TONEMAPPING_FLAG)
+  message(WARNING "Build with Tonemapping")
+  add_definitions( -DTONEMAPPING)
+  set(WITH_TONEMAPPING cvl)
+else()
+  message(WARNING "Build WITHOUT Tonemapping")
+endif()
+
+
 set(CMAKE_CXX_FLAGS "-Wall -Wextra")
 # set(CMAKE_CXX_FLAGS_DEBUG "-g")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 ")
 
 add_subdirectory(tiscamera_interface)
 add_subdirectory(tests)
@@ -54,4 +66,5 @@ target_link_libraries(tiscamera_ros
   ${OpenCV_LIBRARIES}
   tiscamera_interface::tiscamera_interface
   Threads::Threads
+  ${WITH_TONEMAPPING}
 )

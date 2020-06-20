@@ -26,6 +26,11 @@
 
 #include "camera_param.hpp"
 
+// for tonemapping, dependency cvl-mirror repo on GitHub
+#ifdef TONEMAPPING
+#include <cvl/cvl.h>
+#endif
+
 using namespace std;
 typedef CameraIMUSync<VnDeviceCompositeData, TisCameraManager::FrameData, 2> CameraIMUSyncN;
 unsigned char MASK = 0;
@@ -37,18 +42,121 @@ sensor_msgs::CameraInfo left_info, right_info;
 
 std::vector<std::string> CameraParam::camera_list;
 
+
+cv::Mat do_tonemapping(cvl_frame_t* frame, void* srcptr_void, float max_abs_lum)
+{
+
+    
+
+    static cvl_frame_t *_tmpframe = nullptr, *_frame1 = nullptr;
+
+    if(!_tmpframe)
+    {
+    _tmpframe = cvl_frame_new(
+        cvl_frame_width(frame), cvl_frame_height(frame), 
+        4, CVL_UNKNOWN, CVL_FLOAT16, CVL_TEXTURE);
+    }
+
+    std::cout << "do_tonemapping()" << std::endl;
+    float *p = static_cast<float *>(cvl_frame_pointer(frame));
+    uint16_t *srcptr = static_cast<uint16_t *> (srcptr_void);
+    
+    std::cout << "img size = " << cvl_frame_width(frame) * cvl_frame_height(frame) << std::endl;
+
+    double time_start = ros::Time::now().toSec();
+    for (int i = 0; i < cvl_frame_width(frame) * cvl_frame_height(frame); i++)
+    {
+        p[3 * i + 0] = srcptr[i] / max_abs_lum;
+        p[3 * i + 1] = srcptr[i] / max_abs_lum;
+        p[3 * i + 2] = srcptr[i] / max_abs_lum;
+    }
+
+    
+
+    float min_abs_lum;
+    cvl_reduce(frame, CVL_REDUCE_MIN, 1, &min_abs_lum);
+    min_abs_lum *= max_abs_lum;
+
+    min_abs_lum = std::max(0.00001f, min_abs_lum);	
+    max_abs_lum = std::max(min_abs_lum, max_abs_lum);
+
+
+    std::cout << "frame min max:"<< min_abs_lum << ", " << max_abs_lum << std::endl;
+
+    float threshold = 5; // [0,10]
+
+    cvl_frame_free(_frame1);
+    _frame1 = cvl_frame_new(cvl_frame_width(frame), cvl_frame_height(frame),
+    		    3, CVL_XYZ, CVL_FLOAT16, CVL_TEXTURE);
+
+    cvl_tonemap_ashikhmin02(_frame1, frame, 
+		    min_abs_lum, max_abs_lum,
+		    _tmpframe, threshold);
+
+    float ret_min, ret_max;
+    cvl_reduce(_frame1, CVL_REDUCE_MIN, 1, &ret_min);
+    cvl_reduce(_frame1, CVL_REDUCE_MAX, 1, &ret_max);
+
+    std::cout << "frame1 min max:"<< ret_min << ", " << ret_max << std::endl;
+
+    double time_end = ros::Time::now().toSec();
+
+    // cvl_frame_free(frame);
+    
+    auto mat = cv::Mat(cv::Size(cvl_frame_width(frame), cvl_frame_height(frame)), CV_16UC1);
+
+    p = static_cast<float *>(cvl_frame_pointer(_frame1));
+    for (int i = 0; i < cvl_frame_width(frame) * cvl_frame_height(frame); i++)
+    {
+        mat.at<ushort>(i) = (uint16_t)(p[3 * i] * max_abs_lum);
+    }
+
+    std::cout << "time for tonemapping = "<< 1000 * (time_end - time_start) << " msecs" << std::endl;
+
+    return mat;
+}
+
 // template <class TimuData, class TcameraData, int Ncamera>
 void callbackSynced_handler(CameraIMUSyncN::MetaFrame frame)
 {
+
+    // following code from /cvl-mirror/cvtool/doc/cvl.html
+    static cvl_gl_context_t *gl_context = nullptr;
+    static cvl_frame_t* _tmpframe = nullptr;
+    // cvl_frame_t *input_frame, *output_frame;
+
+    // cvl_frame_t * _tmpframe = cvl_frame_new(20, 10, 
+    //         3, CVL_XYZ, CVL_FLOAT16, CVL_MEM);
+
+    
     // convert data to cv::Mat
 
     auto& left_frame = frame.camera[0];
     auto& right_frame = frame.camera[1];
 
+    if (!_tmpframe)
+    {
+        /* Create a GL context on display ":0" and activate it. */
+        gl_context = cvl_gl_context_new(":0");
+        if (!gl_context)
+        {
+            fprintf(stderr, "Cannot create GL context.\n");
+            abort();
+        }
+
+        cvl_init();
+
+        std::cout << "initialising cvl buffer" << left_frame.width << ", " << left_frame.height << std::endl;
+        _tmpframe = cvl_frame_new(left_frame.width, left_frame.height, 3, CVL_XYZ, CVL_FLOAT16, CVL_TEXTURE); // OR CVL_FLOAT
+    }
+
+    cv::Mat frame_ret_l = do_tonemapping(_tmpframe, left_frame.image_data, 65535);
+    
+    auto left = frame_ret_l;
+    // auto left = cv::Mat(cv::Size(left_frame.width, left_frame.height), CV_16UC1, left_frame.image_data, cv::Mat::AUTO_STEP);
+    auto right = cv::Mat(cv::Size(right_frame.width, right_frame.height), CV_16UC1, right_frame.image_data, cv::Mat::AUTO_STEP);
     
 
-    auto left = cv::Mat(cv::Size(left_frame.width, left_frame.height), CV_16UC1, left_frame.image_data, cv::Mat::AUTO_STEP);
-    auto right = cv::Mat(cv::Size(right_frame.width, right_frame.height), CV_16UC1, right_frame.image_data, cv::Mat::AUTO_STEP);
     
 
     // (const cv::Mat imageLeft_cv,const cv::Mat imageRight_cv, const std::string encoding, const sensor_msgs::CameraInfo cameraInfo_left, const sensor_msgs::CameraInfo cameraInfo_right, const ros::Time sensor_timestamp);
@@ -126,6 +234,7 @@ void loadCalibration(const ros::NodeHandle &nh)
 
 int main(int argc, char **argv)
 {
+    
     ros::init(argc, argv, "tiscamera_ros");
     ros::NodeHandle nh_local("~");
 
