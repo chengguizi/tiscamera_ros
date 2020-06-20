@@ -7,6 +7,10 @@ height: 1080
 gst_max_frame_rate: 30 # should be heigher than actual sync_rate
 format: GRAY16_LE
 
-
-initial_exposure: 18000 # us
+# indoor conditions
+initial_exposure: 7500 # us
 initial_gain: 0 # range from 0 to 480
+
+# low light conditions
+# initial_exposure: 10000 # us
+# initial_gain: 200 # range from 0 to 480

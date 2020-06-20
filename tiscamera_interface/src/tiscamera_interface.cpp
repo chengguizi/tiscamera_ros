@@ -30,6 +30,11 @@ TisCameraManager::TisCameraManager(const std::string topic_ns, const std::string
     prop_gain_mode = get_property("Gain Auto");
     prop_gain = get_property("Gain");
 
+    // std::cout << "Obtaining properties for Tonemapping" << std::endl;
+    // prop_tonemapping_mode = get_property("Tonemapping");
+    // prop_tonemapping_intensity = get_property("Tonemapping Intensity");
+    // prop_tonemapping_global_brightness = get_property("Tonemapping Global Brightness");
+
     std::cout << "Tiscamera initialised" << std::endl;
 }
 
@@ -120,6 +125,17 @@ bool TisCameraManager::set_gain(int value)
     return true;
 }
 
+bool TisCameraManager::set_tonemapping_mode(bool value)
+{
+    std::cout << "setting tonemapping mode to " << value << std::endl;
+
+    if (!prop_tonemapping_mode->set((*this), value))
+    {
+        throw std::runtime_error("set tonemapping mode FAILED");
+    }
+    return true;
+}
+
 void TisCameraManager::set_capture_format(std::string format, FrameSize size, FrameRate framerate)
 {
     TcamCamera::set_capture_format(format, size, framerate);
@@ -175,33 +191,66 @@ GstFlowReturn TisCameraManager::setFrame(GstAppSink *appsink, gpointer data)
 
         // std::cout  << "frame_width " << frame_width << ", frame_height " << frame_height << ", bytes_per_pixel " << bytes_per_pixel << std::endl;
 
+        
+        // DEBUG: BUFFER metadata
+        // https://thiblahute.github.io/GStreamer-doc/design/meta.html?gi-language=c
+        // https://developer.gnome.org/gstreamer/stable/gstreamer-GstBuffer.html#gst-buffer-get-meta
+        
         // Obtain metadata from Tiscamera specifics
-        const GstMetaInfo * meta_info = gst_meta_get_info("TcamStatisticsMeta");
-        assert(meta_info);
 
-        TcamStatisticsMeta *meta = (TcamStatisticsMeta *) gst_buffer_get_meta(buffer, meta_info->api); 
+        GstMeta* meta = gst_buffer_get_meta(buffer, g_type_from_name("TcamStatisticsMetaApi"));
+        if (meta)
+        {
+            // printf("We have meta\n");
+            frame.data.meta_api = meta->info->api;
+        }
+        else
+        {
+            g_warning("No meta data available\n");
+        }
 
-        gst_structure_get_uint64(meta->structure, "frame_count", &frame.data.frame_count);
-        gst_structure_get_uint64(meta->structure, "frames_dropped", &frame.data.frames_dropped); 
-        // this is a monotonic clock, but not realtime
-        gst_structure_get_uint64(meta->structure, "capture_time_ns", &frame.data.capture_time_ns);
-        gst_structure_get_double(meta->structure, "framerate", &frame.data.framerate);
-        gst_structure_get_boolean(meta->structure, "is_damaged", &frame.data.is_damaged);
+        // if(!frame.data.initialised){
+        //     int meta_count = 0;
+        //     GstMeta *current;
+        //     gpointer state = NULL;
 
-        // uint64_t camera_time_ns;
-        // if (gst_structure_get_uint64(meta->structure, "camera_time_ns", &camera_time_ns))
-        //     std::cout << "camera_time_ns = " << camera_time_ns << std::endl;
+        //     current = gst_buffer_iterate_meta(buffer, &state);
 
-            // gst_structure_set(struc,
-            //               "frame_count", G_TYPE_UINT64, statistics->frame_count,
-            //               "frames_dropped", G_TYPE_UINT64, statistics->frames_dropped,
-            //               "capture_time_ns", G_TYPE_UINT64, statistics->capture_time_ns,
-            //               "camera_time_ns", G_TYPE_UINT64, statistics->camera_time_ns,
-            //               "framerate", G_TYPE_DOUBLE, statistics->framerate,
-            //               "is_damaged", G_TYPE_BOOLEAN, statistics->is_damaged,
-            //               nullptr);
-            // frame copy to frame struct
+        //     while(current != nullptr){
+        //         printf("gst_meta_api_type_get_tags = %d\n" , gst_meta_api_type_get_tags(current->info->api));
+        //         const char* name = g_type_name (current->info->type);
+        //         printf("g_type_name_%d = %s\n", meta_count, name);
 
+        //         if(!strcmp(name, "TcamStatisticsMeta")){ // changed string to TcamStatisticsMetaApi in version tiscamera 0.12
+        //             frame.data.meta_api = current->info->api; 
+        //             std::cout  << "We have meta for Tiscamera!" << std::endl;
+        //         }
+
+        //         current = gst_buffer_iterate_meta(buffer, &state);
+        //         meta_count++;
+        //     }
+
+        //     std::cout  << "Found " << meta_count << " metadata entries in the buffer frame" << std::endl;
+        // }
+
+        // const GstMetaInfo * meta_info = gst_meta_get_info("TcamStatisticsMeta");
+
+        if (frame.data.meta_api > 0){
+            TcamStatisticsMeta *meta = (TcamStatisticsMeta *) gst_buffer_get_meta(buffer, frame.data.meta_api);
+
+            assert(meta);
+
+            gst_structure_get_uint64(meta->structure, "frame_count", &frame.data.frame_count);
+            gst_structure_get_uint64(meta->structure, "frames_dropped", &frame.data.frames_dropped); 
+            // this is a monotonic clock, but not realtime
+            gst_structure_get_uint64(meta->structure, "capture_time_ns", &frame.data.capture_time_ns);
+            gst_structure_get_double(meta->structure, "framerate", &frame.data.framerate);
+            gst_structure_get_boolean(meta->structure, "is_damaged", &frame.data.is_damaged);
+        }
+        
+
+
+        //// Obtain buffer info
         GstMapInfo info;
         gst_buffer_map(buffer, &info, GST_MAP_READ);
 
@@ -225,13 +274,15 @@ GstFlowReturn TisCameraManager::setFrame(GstAppSink *appsink, gpointer data)
         gst_buffer_unmap (buffer, &info);
         gst_sample_unref(sample);
 
-        std::cout << frame.data.topic_ns << " " << frame.data.capture_time_ns  << " frame " << frame.data.frame_count << std::endl;
+        // std::cout << frame.data.topic_ns << " " << frame.data.capture_time_ns  << " frame " << frame.data.frame_count << std::endl;
 
         if (_cblist_camera.size())
         {
             for (auto& cb : _cblist_camera)
                 cb(frame.data);
         }
+
+        frame.data.initialised = true;
 
         frame.mtx.unlock();
         frame.con.notify_all();

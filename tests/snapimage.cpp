@@ -12,8 +12,10 @@ As sample image processing an OpenCV cv::Mat is generated and saved as JPEG
 #include <stdlib.h>
 
 #include <unistd.h>
+
+#include <string>
  
-#include "tcamimage.h"
+#include "tiscamera_interface/tiscamera_interface.hpp"
 
 #include "opencv2/opencv.hpp"
 
@@ -33,61 +35,77 @@ void ListProperties(TcamCamera &cam)
     }
 }
 
+bool take_next = false;
+TisCameraManager* cam = nullptr;
+
+void imageCallback(const TisCameraManager::FrameData& data){
+
+    // static int last_remainder = 0;
+    static int total_count = 1;
+    
+
+    if (take_next){
+        std::cout << data.frame_count << "taken." << std::endl;
+
+        cv::Mat OpenCVImage;
+        OpenCVImage.create( data.height, data.width,CV_16UC1);
+        memcpy( OpenCVImage.data, data.image_data, data.bytes_per_pixel*data.height*data.width);
+        std::ostringstream filename;
+
+        // test for bit range
+        // for
+
+        filename << total_count << "-" << data.frame_count << ".tiff";
+
+        cv::imwrite(filename.str() ,OpenCVImage);
+        take_next = false;
+        total_count++;
+    }
+    
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char **argv)
 {
     gst_init(&argc, &argv);
 
-    cv::Mat OpenCVImage;
-    // Initialize our TcamCamera object "cam" with the serial number
-    // of the camera, which is to be used in this program.
-    TcamImage cam;
-    // TcamImage cam("30914056");
-    //TcamCamera cam("00001234");
 
-    ListProperties(cam);
+    cam = new TisCameraManager("30914056");
+
+    ListProperties(*cam);
 
     // Comment following line, if no live video display is wanted.
-    cam.enable_video_display(gst_element_factory_make("ximagesink", NULL));
+    cam->enable_video_display(gst_element_factory_make("ximagesink", NULL));
     
     // Set a color video format, resolution and frame rate
-    cam.set_capture_format("GRAY16_LE", FrameSize{640,480}, FrameRate{30,1});
+    cam->set_capture_format("GRAY16_LE", FrameSize{1440,1080}, FrameRate{30,1});
+    // cam.set_capture_format("GRAY16_LE", FrameSize{640,480}, FrameRate{30,1});
 
-
-    // sleep(1);
-    // return 0;
-    
     // Start the camera
-    cam.start();
+    cam->set_trigger_mode(TisCameraManager::NONE);
+    cam->set_exposure_gain_auto(false);
+    cam->set_exposure_time(10000); // in us
+    cam->set_gain(200);
 
-    // sleep(1);
-    printf("Start Snap\n");
+    // cam->set_tonemapping_mode(true);
 
-    std::cout  << " cam.getBytesPerPixel() = " << cam.getBytesPerPixel() << std::endl;
+    cam->start();
 
-    // Snap an Image with 60 ms timeout. Should be set accordingly to the
-    // frame rate.
-    if( cam.snapImage(500) )
-    {
-        // On succes do something with the image data. Here we create
-        // a cv::Mat and save the image
-        // OpenCVImage.create( cam.getHeight(),cam.getWidth(),CV_16UC1);
-        // memcpy( OpenCVImage.data, cam.getImageData(), cam.getImageDataSize());
-        // cv::imwrite("test.png",OpenCVImage);
+    cam->registerCallback(imageCallback);
+
+    printf("You may start Snap now\n");
+
+    // char dummyvalue;
+
+    while(true){
+        // printf("Press space key to take Snap.\n");
+        std::cin.get();
+
+        take_next = true;
+        
     }
-    else
-    {
-        printf("Timeout at snapImage()\n");
-    }
-    sleep(3);
-    cam.set_capture_format("GRAY16_LE", FrameSize{1440,1080}, FrameRate{30,1});
 
-    printf("Press enter key to end program.");
-    // Simple implementation of "getch()", wait for enter key.
-    char dummyvalue[10];
-    scanf("%c",dummyvalue);
-
-    cam.stop();
+    cam->stop();
 
     return 0;
 }

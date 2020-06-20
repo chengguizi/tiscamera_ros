@@ -141,8 +141,7 @@ void CameraIMUSync<TimuData,TcameraData, Ncamera>::push_backCamera(const Tcamera
         // Now, checking if the camera is not too far ahead the current imu
         if ( imu_time - max_imu_read_jitter < camera_time){ // allow IMU to be slightly slower than camera, due to jitter
             
-            std::cout << "Adding frame " << index << "( time " << camera_time << ") to IMU " << int(i) << "(" << imu_time << ")" << std::endl;
-            std::cout << "Slack (ms) = " << slack_sec * 1e3 << std::endl; 
+            std::cout << "Slack (ms) = " << slack_sec * 1e3 << ", Adding frame " << index << "( time " << camera_time << ") to IMU " << int(i) << "(" << imu_time << ")" << std::endl;
             const unsigned char bit = 1 << index;
             assert( (frame.cameraBitMask & bit) == 0);
 
@@ -153,7 +152,7 @@ void CameraIMUSync<TimuData,TcameraData, Ncamera>::push_backCamera(const Tcamera
             // detect if bitMask is full
             if (frame.isComplete())
             {
-                std::cout << "IMU sync complete! for index " << MASK(i) << std::endl;
+                std::cout << "IMU sync complete! for index " << MASK(i) << std::endl << std::endl;
 
                 if( i != MASK(begin)){
                     std::cerr << "[[[[[WARNING: Skipping " << MASK(i-begin) << " IMU data]]]]]" << std::endl;

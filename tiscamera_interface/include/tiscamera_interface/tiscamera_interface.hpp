@@ -21,6 +21,7 @@ class TisCameraManager : public gsttcam::TcamCamera
         };
 
         struct FrameData{
+            bool initialised = false;
 
             // Static info
             std::string topic_ns;
@@ -31,10 +32,10 @@ class TisCameraManager : public gsttcam::TcamCamera
             std::string pixel_format;
 
             // Gstreamer Metadata
+            unsigned long meta_api = 0;
             uint64_t frame_count;
             uint64_t frames_dropped;
             uint64_t capture_time_ns;
-            // uint64_t camera_time_ns;
             double framerate;
             int is_damaged; // gboolean is implemented as int
 
@@ -53,7 +54,9 @@ class TisCameraManager : public gsttcam::TcamCamera
         bool set_exposure_gain_auto(bool value);
         bool set_exposure_time(int value);
         bool set_gain(int value);
-        bool set_low_latency_mode(bool value);
+        // bool set_low_latency_mode(bool value);
+        bool set_tonemapping_mode(bool value);
+        bool set_tonemapping_param(float intensity, float global_brightness); // range: -8 to 8, default 1; range: 0 to 1, default 0
 
         void set_capture_format(std::string format, gsttcam::FrameSize size, gsttcam::FrameRate framerate);
         bool start(); // gst playing state
@@ -81,6 +84,9 @@ class TisCameraManager : public gsttcam::TcamCamera
         std::shared_ptr<gsttcam::Property> prop_gain_mode;
         std::shared_ptr<gsttcam::Property> prop_exposure_time;
         std::shared_ptr<gsttcam::Property> prop_gain;
+        std::shared_ptr<gsttcam::Property> prop_tonemapping_mode;
+        std::shared_ptr<gsttcam::Property> prop_tonemapping_intensity;
+        std::shared_ptr<gsttcam::Property> prop_tonemapping_global_brightness;
 
         std::vector<callbackCamera> _cblist_camera;
 
