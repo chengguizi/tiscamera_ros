@@ -8,8 +8,19 @@ gst_max_frame_rate: 30 # should be heigher than actual sync_rate
 format: GRAY16_LE
 
 # indoor conditions
-initial_exposure: 7500 # us
+initial_exposure: 3000 # us
 initial_gain: 0 # range from 0 to 480
+initial_gamma: 0.7
+
+exposure_auto_reference: 110
+
+auto_upper_limit_exposure: false
+
+lower_limit_exposure: 333 # us
+lower_limit_gain: 0
+
+upper_limit_exposure: 20000 # us
+upper_limit_gain: 300 # range from 0 to 480
 
 # low light conditions
 # initial_exposure: 10000 # us

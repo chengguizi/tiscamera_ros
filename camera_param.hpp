@@ -20,8 +20,22 @@ public:
     std::string exposure_mode = "auto";
     std::string format = "GRAY16_LE";
 
+    std::string tonemapping_mode = "none";
+    float tonemapping_intensity = 1.0;
+    float tonemapping_global_brightness = 0.5;
+
     // Exposure control param
     int initial_exposure, initial_gain;
+    float initial_gamma;
+
+    int exposure_auto_reference = 128;
+
+    bool highlight_reduction = false;
+
+    bool auto_upper_limit_exposure = false;
+
+    int lower_limit_exposure = 333, upper_limit_exposure = 10000; // us
+    int lower_limit_gain = 0 , upper_limit_gain = 200;
 
     static std::vector<std::string> camera_list;
     static std::vector<std::string>  loadCameras(const ros::NodeHandle& nh);
@@ -50,6 +64,12 @@ void CameraParam::loadParam(const std::string& topic_ns)
     nh_local.getParam("hardware_sync_mode", hardware_sync_mode);
     nh_local.getParam("exposure_mode", exposure_mode); // internal, or custom
 
+    nh_local.getParam("tonemapping_mode", tonemapping_mode);
+    nh_local.getParam("tonemapping_intensity", tonemapping_intensity);
+    nh_local.getParam("tonemapping_global_brightness", tonemapping_global_brightness);
+
+    nh_local.getParam("highlight_reduction", highlight_reduction);
+
     // Obtain Type Specific Params
     ros::NodeHandle nh_type("~/" + type);
     nh_type.getParam("width",width);
@@ -64,5 +84,14 @@ void CameraParam::loadExposureControlParam(const std::string& type)
     ros::NodeHandle nh_local("~/" + type);
     nh_local.getParam("initial_exposure",initial_exposure);
     nh_local.getParam("initial_gain",initial_gain);
+    nh_local.getParam("initial_gamma", initial_gamma);
+
+    nh_local.getParam("exposure_auto_reference", exposure_auto_reference);
+
+    nh_local.getParam("lower_limit_exposure", lower_limit_exposure);
+    nh_local.getParam("upper_limit_exposure", upper_limit_exposure);
+
+    nh_local.getParam("lower_limit_gain", lower_limit_gain);
+    nh_local.getParam("upper_limit_gain", upper_limit_gain);
 
 }

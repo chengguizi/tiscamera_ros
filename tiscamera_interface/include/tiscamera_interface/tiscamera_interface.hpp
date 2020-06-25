@@ -53,10 +53,16 @@ class TisCameraManager : public gsttcam::TcamCamera
         bool set_trigger_mode(TriggerMode value);
         bool set_exposure_gain_auto(bool value);
         bool set_exposure_time(int value);
+        bool set_exposure_limits(bool auto_upper, int lower, int upper);
+        bool set_exposure_auto_reference(int value);
         bool set_gain(int value);
+        bool set_gain_limits(int lower, int upper);
+        bool set_gamma(float value);
         // bool set_low_latency_mode(bool value);
         bool set_tonemapping_mode(bool value);
         bool set_tonemapping_param(float intensity, float global_brightness); // range: -8 to 8, default 1; range: 0 to 1, default 0
+        
+        bool set_highlight_reduction(bool value);
 
         void set_capture_format(std::string format, gsttcam::FrameSize size, gsttcam::FrameRate framerate);
         bool start(); // gst playing state
@@ -84,9 +90,22 @@ class TisCameraManager : public gsttcam::TcamCamera
         std::shared_ptr<gsttcam::Property> prop_gain_mode;
         std::shared_ptr<gsttcam::Property> prop_exposure_time;
         std::shared_ptr<gsttcam::Property> prop_gain;
+        std::shared_ptr<gsttcam::Property> prop_gamma;
+
+        std::shared_ptr<gsttcam::Property> prop_exposure_auto_reference;
+
+        std::shared_ptr<gsttcam::Property> prop_auto_exposure_upper_limit;
+
+        std::shared_ptr<gsttcam::Property> prop_lower_limit_exposure;
+        std::shared_ptr<gsttcam::Property> prop_upper_limit_exposure;
+        std::shared_ptr<gsttcam::Property> prop_lower_limit_gain;
+        std::shared_ptr<gsttcam::Property> prop_upper_limit_gain;
+
         std::shared_ptr<gsttcam::Property> prop_tonemapping_mode;
         std::shared_ptr<gsttcam::Property> prop_tonemapping_intensity;
         std::shared_ptr<gsttcam::Property> prop_tonemapping_global_brightness;
+
+        std::shared_ptr<gsttcam::Property> prop_highlight_reduction;
 
         std::vector<callbackCamera> _cblist_camera;
 

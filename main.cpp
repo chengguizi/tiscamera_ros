@@ -43,33 +43,75 @@ sensor_msgs::CameraInfo left_info, right_info;
 std::vector<std::string> CameraParam::camera_list;
 
 
-cv::Mat do_tonemapping(cvl_frame_t* frame, void* srcptr_void, float max_abs_lum)
+
+void ListProperties(TisCameraManager &cam)
+{
+    // Get a list of all supported properties and print it out
+    auto properties = cam.get_camera_property_list();
+    std::cout << "Properties:" << std::endl;
+    for(auto &prop : properties)
+    {
+        std::cout << prop->to_string() << std::endl;
+    }
+}
+
+
+/*
+
+Handling High Dynamic Range (HDR) frames.
+All tone mapping operators (TMOs) take normalized CVL_XYZ frames as input. 
+If you have CVL_XYZ frames with absolute values, you need to convert them with cvl_luminance_range() first. 
+
+TMOs that work on absolute luminance values have an additional parameter called max_abs_lum. 
+If the maximum absolute luminance is known, this parameter can be set accordingly. 
+If the maximum absolute luminance is not known, the parameter can be used to prescale the values to a suitable range.
+
+*/
+
+// to memory copy the data from srcptr_raw to frame, and convert to rgb (xyz) float, before processing
+cv::Mat do_tonemapping(cvl_frame_t* frame, void* srcptr_raw, float max_abs_lum)
 {
 
-    
-
+    //// declare a temperary frame to pass to the tonemapping function call
     static cvl_frame_t *_tmpframe = nullptr, *_frame1 = nullptr;
-
     if(!_tmpframe)
     {
     _tmpframe = cvl_frame_new(
         cvl_frame_width(frame), cvl_frame_height(frame), 
-        4, CVL_UNKNOWN, CVL_FLOAT16, CVL_TEXTURE);
+        4, CVL_UNKNOWN, CVL_FLOAT16, CVL_MEM);
     }
+
+
+    auto mat = cv::Mat(cv::Size(cvl_frame_width(frame), cvl_frame_height(frame)), CV_16UC1);
+
+    //// memory copy from raw buffer to a frame
+
+
+    //// convert greyscale to rgb (xyz)
+    // cv::cvtColor(src, src, cv::COLOR_GRAY2RGB);
+    // assert(src.isContinuous());
+
+    //// fill up frame's data from opencv
+
+    
 
     std::cout << "do_tonemapping()" << std::endl;
     float *p = static_cast<float *>(cvl_frame_pointer(frame));
-    uint16_t *srcptr = static_cast<uint16_t *> (srcptr_void);
+    uint16_t *srcptr = static_cast<uint16_t *> (srcptr_raw);
     
     std::cout << "img size = " << cvl_frame_width(frame) * cvl_frame_height(frame) << std::endl;
 
     double time_start = ros::Time::now().toSec();
+    
     for (int i = 0; i < cvl_frame_width(frame) * cvl_frame_height(frame); i++)
     {
-        p[3 * i + 0] = srcptr[i] / max_abs_lum;
-        p[3 * i + 1] = srcptr[i] / max_abs_lum;
-        p[3 * i + 2] = srcptr[i] / max_abs_lum;
+        float scaled = srcptr[i] / max_abs_lum;
+        p[3 * i + 0] = scaled;
+        p[3 * i + 1] = scaled;
+        p[3 * i + 2] = scaled;
     }
+
+    double time_end = ros::Time::now().toSec();
 
     
 
@@ -89,9 +131,13 @@ cv::Mat do_tonemapping(cvl_frame_t* frame, void* srcptr_void, float max_abs_lum)
     _frame1 = cvl_frame_new(cvl_frame_width(frame), cvl_frame_height(frame),
     		    3, CVL_XYZ, CVL_FLOAT16, CVL_TEXTURE);
 
+    
+
     cvl_tonemap_ashikhmin02(_frame1, frame, 
 		    min_abs_lum, max_abs_lum,
 		    _tmpframe, threshold);
+
+    
 
     float ret_min, ret_max;
     cvl_reduce(_frame1, CVL_REDUCE_MIN, 1, &ret_min);
@@ -99,17 +145,19 @@ cv::Mat do_tonemapping(cvl_frame_t* frame, void* srcptr_void, float max_abs_lum)
 
     std::cout << "frame1 min max:"<< ret_min << ", " << ret_max << std::endl;
 
-    double time_end = ros::Time::now().toSec();
-
-    // cvl_frame_free(frame);
     
-    auto mat = cv::Mat(cv::Size(cvl_frame_width(frame), cvl_frame_height(frame)), CV_16UC1);
+    
+    
+
+    
 
     p = static_cast<float *>(cvl_frame_pointer(_frame1));
     for (int i = 0; i < cvl_frame_width(frame) * cvl_frame_height(frame); i++)
     {
         mat.at<ushort>(i) = (uint16_t)(p[3 * i] * max_abs_lum);
     }
+
+    
 
     std::cout << "time for tonemapping = "<< 1000 * (time_end - time_start) << " msecs" << std::endl;
 
@@ -147,13 +195,13 @@ void callbackSynced_handler(CameraIMUSyncN::MetaFrame frame)
         cvl_init();
 
         std::cout << "initialising cvl buffer" << left_frame.width << ", " << left_frame.height << std::endl;
-        _tmpframe = cvl_frame_new(left_frame.width, left_frame.height, 3, CVL_XYZ, CVL_FLOAT16, CVL_TEXTURE); // OR CVL_FLOAT
+        _tmpframe = cvl_frame_new(left_frame.width, left_frame.height, 3, CVL_XYZ, CVL_FLOAT16, CVL_MEM); // OR CVL_FLOAT
     }
 
-    cv::Mat frame_ret_l = do_tonemapping(_tmpframe, left_frame.image_data, 65535);
+    // cv::Mat frame_ret_l = do_tonemapping(_tmpframe, left_frame.image_data, 65535);
     
-    auto left = frame_ret_l;
-    // auto left = cv::Mat(cv::Size(left_frame.width, left_frame.height), CV_16UC1, left_frame.image_data, cv::Mat::AUTO_STEP);
+    // auto left = frame_ret_l;
+    auto left = cv::Mat(cv::Size(left_frame.width, left_frame.height), CV_16UC1, left_frame.image_data, cv::Mat::AUTO_STEP);
     auto right = cv::Mat(cv::Size(right_frame.width, right_frame.height), CV_16UC1, right_frame.image_data, cv::Mat::AUTO_STEP);
     
 
@@ -305,6 +353,7 @@ int main(int argc, char **argv)
             // std::cout << "Enable Display" << std::endl;
             // camera->enable_video_display(gst_element_factory_make("ximagesink", NULL));
             std::cout << "Setting Capture Format..." << std::endl;
+            // camera->set_capture_format("GRAY16_LE", gsttcam::FrameSize{1440,1080}, gsttcam::FrameRate{30,1});
             camera->set_capture_format("GRAY16_LE", gsttcam::FrameSize{param.width,param.height}, gsttcam::FrameRate{param.gst_max_frame_rate,1}); // {1440,1080}
             
             if (param.exposure_mode == "manual")
@@ -314,12 +363,14 @@ int main(int argc, char **argv)
                 camera->set_exposure_time(param.initial_exposure); // in us
                 camera->set_gain(param.initial_gain);
             }
-            else
+            else if (param.exposure_mode == "internal")
             {
                 std::cout << "Setting Exposure Mode Auto" << std::endl;
                 camera->set_exposure_gain_auto(true);
+            }else
+            {
+                throw std::runtime_error("Unknown Exposure Mode");
             }
-                
             
             
 
@@ -334,6 +385,32 @@ int main(int argc, char **argv)
                 std::cout << "Camera " << camera_ns << " Hardware Sync ENABLED" << std::endl;
                 camera->set_trigger_mode(TisCameraManager::TRIGGER_RISING_EDGE);
             }
+
+            // POST START PARAMETERS
+            //// tonemapping parameters
+            if (param.tonemapping_mode == "internal")
+            {
+                camera->set_tonemapping_mode(true);
+                camera->set_tonemapping_param(param.tonemapping_intensity, param.tonemapping_global_brightness);
+
+            }else{
+                camera->set_tonemapping_mode(false);
+            }
+
+            //// gamma
+            camera->set_gamma(param.initial_gamma);
+
+            //// highlight reduction
+            camera->set_highlight_reduction(param.highlight_reduction);
+
+            //// auto exposure settings
+            camera->set_exposure_limits(param.auto_upper_limit_exposure, param.lower_limit_exposure, param.upper_limit_exposure);
+            camera->set_gain_limits(param.lower_limit_gain, param.upper_limit_gain);
+
+            camera->set_exposure_auto_reference(param.exposure_auto_reference);
+
+            ListProperties(*camera);
+            
 
             ROS_INFO_STREAM("Camera " << camera_ns << " Started...");            
 

@@ -551,8 +551,8 @@ void
 TcamCamera::set_capture_format(std::string format, FrameSize size, FrameRate framerate)
 {
 
-    GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN(pipeline_),
-                              GST_DEBUG_GRAPH_SHOW_ALL, "pipeline-pre");
+    // GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN(pipeline_),
+    //                           GST_DEBUG_GRAPH_SHOW_ALL, "pipeline-pre");
 
     GstCaps *caps = gst_caps_new_simple("video/x-raw",
                                         "width", G_TYPE_INT, size.width,
@@ -565,10 +565,12 @@ TcamCamera::set_capture_format(std::string format, FrameSize size, FrameRate fra
 
     if(!is_playing)
     {
+        std::cout << "set_capture_format: set caps while not playing..." << std::endl;
         g_object_set(tcambin_, "device-caps", gst_caps_to_string(caps), nullptr);
     }
     else
     {
+        std::cout << "set_capture_format: set caps while not PLAYING..." << std::endl;
         GstElement *src = gst_bin_get_by_name(GST_BIN(tcambin_), "tcambin-src_caps");
         assert(src);
         g_object_set(src, "caps", caps, nullptr);
@@ -583,8 +585,8 @@ TcamCamera::set_capture_format(std::string format, FrameSize size, FrameRate fra
     // g_object_set(G_OBJECT(capturecapsfilter_), "caps", caps, nullptr);
     gst_caps_unref(caps);
 
-    GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN(pipeline_),
-                              GST_DEBUG_GRAPH_SHOW_ALL, "pipeline-post");
+    // GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN(pipeline_),
+    //                           GST_DEBUG_GRAPH_SHOW_ALL, "pipeline-post");
 }
 
 bool
@@ -592,8 +594,8 @@ TcamCamera::start()
 {
     gst_element_set_state(pipeline_, GST_STATE_PLAYING);
     gst_element_get_state(pipeline_, NULL, NULL, GST_CLOCK_TIME_NONE);
-    GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN(pipeline_),
-                              GST_DEBUG_GRAPH_SHOW_ALL, pipeline_name.c_str());
+    // GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN(pipeline_),
+    //                           GST_DEBUG_GRAPH_SHOW_ALL, pipeline_name.c_str());
 
     is_playing = true;
     return TRUE;

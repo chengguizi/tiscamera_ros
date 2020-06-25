@@ -69,10 +69,12 @@ int main(int argc, char **argv)
 {
     gst_init(&argc, &argv);
 
+    std::string camera_sn = "30914056"; //"30914056" "30914060"
 
-    cam = new TisCameraManager("30914056");
+    cam = new TisCameraManager("snapcam",camera_sn);
 
-    ListProperties(*cam);
+    std::cout << "start camera " << camera_sn << std::endl;
+    
 
     // Comment following line, if no live video display is wanted.
     cam->enable_video_display(gst_element_factory_make("ximagesink", NULL));
@@ -84,12 +86,14 @@ int main(int argc, char **argv)
     // Start the camera
     cam->set_trigger_mode(TisCameraManager::NONE);
     cam->set_exposure_gain_auto(false);
-    cam->set_exposure_time(10000); // in us
-    cam->set_gain(200);
+    cam->set_exposure_time(3000); // in us
+    cam->set_gain(0);
 
     // cam->set_tonemapping_mode(true);
 
     cam->start();
+
+    ListProperties(*cam);
 
     cam->registerCallback(imageCallback);
 

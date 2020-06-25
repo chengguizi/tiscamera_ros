@@ -30,10 +30,7 @@ TisCameraManager::TisCameraManager(const std::string topic_ns, const std::string
     prop_gain_mode = get_property("Gain Auto");
     prop_gain = get_property("Gain");
 
-    // std::cout << "Obtaining properties for Tonemapping" << std::endl;
-    // prop_tonemapping_mode = get_property("Tonemapping");
-    // prop_tonemapping_intensity = get_property("Tonemapping Intensity");
-    // prop_tonemapping_global_brightness = get_property("Tonemapping Global Brightness");
+    // tone mapping properties can only be set after camera is started
 
     std::cout << "Tiscamera initialised" << std::endl;
 }
@@ -114,6 +111,47 @@ bool TisCameraManager::set_exposure_time(int value)
     return true;
 }
 
+bool TisCameraManager::set_exposure_limits(bool auto_upper, int lower, int upper)
+{
+    std::cout << "set auto upper exposure limit to " << auto_upper << std::endl;
+    std::cout << "setting exposure limits to " << lower << " to " << upper << " us" << std::endl;
+
+    prop_auto_exposure_upper_limit = get_property("Exposure Auto Upper Limit Auto");
+
+    if (!prop_auto_exposure_upper_limit->set((*this), auto_upper))
+    {
+        throw std::runtime_error("set auto upper exposure limit mode FAILED");
+    }
+
+    prop_lower_limit_exposure = get_property("Exposure Auto Lower Limit");
+    prop_upper_limit_exposure = get_property("Exposure Auto Upper Limit");
+
+    if (!prop_lower_limit_exposure->set((*this), lower))
+    {
+        throw std::runtime_error("set exposure lower limit FAILED");
+    }
+
+    if (!prop_upper_limit_exposure->set((*this), upper))
+    {
+        throw std::runtime_error("set exposure upper limit FAILED");
+    }
+
+    return true;
+}
+
+bool TisCameraManager::set_exposure_auto_reference(int value)
+{
+    std::cout << "setting exposure auto reference to " << value << std::endl;
+    prop_exposure_auto_reference = get_property("Exposure Auto Reference");
+
+    if (!prop_exposure_auto_reference->set((*this), value))
+    {
+        throw std::runtime_error("set exposure exposure auto reference FAILED");
+    }
+
+    return true;
+}
+
 bool TisCameraManager::set_gain(int value)
 {
     std::cout << "setting gain to " << value << std::endl;
@@ -125,14 +163,88 @@ bool TisCameraManager::set_gain(int value)
     return true;
 }
 
+bool TisCameraManager::set_gain_limits(int lower, int upper)
+{
+    std::cout << "setting gain limits to " << lower << " to " << upper << " us" << std::endl;
+
+    prop_lower_limit_gain = get_property("Gain Auto Lower Limit");
+    prop_upper_limit_gain = get_property("Gain Auto Upper Limit");
+
+    if (!prop_lower_limit_gain->set((*this), lower))
+    {
+        throw std::runtime_error("set gain lower limit FAILED");
+    }
+
+    if (!prop_upper_limit_gain->set((*this), upper))
+    {
+        throw std::runtime_error("set gain upper limit FAILED");
+    }
+
+    return true;
+}
+
+bool TisCameraManager::set_gamma(float value)
+{
+    std::cout << "setting gamma to " << value << std::endl;
+
+    prop_gamma = get_property("Gamma");
+
+    if (!prop_gamma->set((*this), value))
+    {
+        throw std::runtime_error("set gamma FAILED");
+    }
+    return true;
+}
+
 bool TisCameraManager::set_tonemapping_mode(bool value)
 {
+
+    // std::cout << "Obtaining properties for Tonemapping" << std::endl;
+    prop_tonemapping_mode = get_property("Tonemapping");
+
     std::cout << "setting tonemapping mode to " << value << std::endl;
 
     if (!prop_tonemapping_mode->set((*this), value))
     {
         throw std::runtime_error("set tonemapping mode FAILED");
+        return false;
     }
+    return true;
+}
+
+bool TisCameraManager::set_tonemapping_param(float intensity, float global_brightness)
+{
+    prop_tonemapping_intensity = get_property("Tonemapping Intensity");
+    prop_tonemapping_global_brightness = get_property("Tonemapping Global Brightness");
+
+    std::cout << "setting tonemapping intensity to " << intensity << std::endl;
+    std::cout << "setting tonemapping global brightness to " << global_brightness << std::endl;
+
+    if (!prop_tonemapping_intensity->set((*this), intensity))
+    {
+        throw std::runtime_error("set tonemapping intensity FAILED");
+        return false;
+    }
+
+    if (!prop_tonemapping_global_brightness->set((*this), global_brightness))
+    {
+        throw std::runtime_error("set global brightness mode FAILED");
+        return false;
+    }
+
+    return true;
+}
+
+
+bool TisCameraManager::set_highlight_reduction(bool value)
+{
+    prop_highlight_reduction = get_property("Highlight Reduction");
+    if (!prop_highlight_reduction->set((*this), value))
+    {
+        throw std::runtime_error("set Highlight Reduction FAILED");
+        return false;
+    }
+
     return true;
 }
 
