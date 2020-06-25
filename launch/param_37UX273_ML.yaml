@@ -20,7 +20,7 @@ lower_limit_exposure: 333 # us
 lower_limit_gain: 0
 
 upper_limit_exposure: 20000 # us
-upper_limit_gain: 300 # range from 0 to 480
+upper_limit_gain: 200 # range from 0 to 480
 
 # low light conditions
 # initial_exposure: 10000 # us

@@ -16,8 +16,8 @@ fisheye_right:
   type: 37UX273_ML
   sn: '30914060'
   exposure_mode: internal # manual, internal
-  tonemapping_mode: none
-  tonemapping_intensity: 1 # [-8,8]
+  tonemapping_mode: internal
+  tonemapping_intensity: 8 # [-8,8]
   tonemapping_global_brightness: 0.5 # [0,1]
   highlight_reduction: true
   hardware_sync_mode: slave
