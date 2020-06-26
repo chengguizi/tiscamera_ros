@@ -2,7 +2,7 @@
  * @Author: Cheng Huimin 
  * @Date: 2019-09-24 14:45:57 
  * @Last Modified by: Cheng Huimin
- * @Last Modified time: 2019-09-24 21:32:30
+ * @Last Modified time: 2020-06-26 17:34:08
  */
 #ifndef CAMERA_IMU_SYNC_HPP
 #define CAMERA_IMU_SYNC_HPP
@@ -21,25 +21,35 @@
  * 
  * For simplicity and efficiency, here we assume IMU data always come in before all camera frames, in realtime
  */ 
-template <class TimuData, class TcameraData, int Ncamera>
+template <class TcameraData>
 class CameraIMUSync{
     public:
 
         struct MetaFrame{
-            TimuData imu;
             uint64_t trigger_time;
-            TcameraData camera[Ncamera];
+            std::vector<TcameraData> camera;
             unsigned char cameraBitMask;
 
             void reset(){cameraBitMask = 0;};
-            bool isComplete(){return (cameraBitMask == CAMERA_MASK); };
+            bool isComplete(const unsigned char& CAMERA_MASK){return (cameraBitMask == CAMERA_MASK); };
         };
 
-        CameraIMUSync(){};
+        CameraIMUSync(int Ncamera) : Ncamera(Ncamera){
+
+            // initialise meta frame to have buffer size
+            metaFrame.resize(BUFFER_SIZE);
+
+            // initialise image buffers within each frame
+            for (auto& f : metaFrame)
+                f.camera.resize(Ncamera);
+
+            // intialise masks
+            CAMERA_MASK = std::pow(2, Ncamera) - 1;
+        };
         void set_max_slack(double sec){max_slack = sec * 1e9;}; // maximum tolerated delay of camera respect to IMU
         void set_imu_read_jitter(double sec){max_imu_read_jitter = sec * 1e9;}; // maximum delay of imu buffer being read by kernel
         void set_camera_mask(const unsigned char camera_mask){CAMERA_MASK = camera_mask;};
-        void push_backIMU(const TimuData& data);
+        void push_backIMU(uint64_t monotonic_time, uint64_t timeSyncIn);
         void push_backCamera(const TcameraData& data, const uint index);
         
         typedef std::function<void(const MetaFrame&)> callbackSynced;
@@ -48,18 +58,19 @@ class CameraIMUSync{
     
     private:
 
+        unsigned int Ncamera;
+        unsigned char CAMERA_MASK;
+
         const static uint BUFFER_SIZE = 16;
         unsigned char BUFFER_MASK = BUFFER_SIZE - 1;
         #define MASK(x) ((x) & BUFFER_MASK)
-
-        static unsigned char CAMERA_MASK;
 
         uint64_t max_slack; // maximum duration an IMU will wait for a camera frame         
         uint64_t max_imu_read_jitter;
         std::mutex mtx;
         
 
-        MetaFrame metaFrame[BUFFER_SIZE];
+        std::vector<MetaFrame> metaFrame;
 
         std::forward_list<std::function<void(const TcameraData&, const uint)>> cam_callback_cache;
 
@@ -70,8 +81,8 @@ class CameraIMUSync{
         void syncedCallback(const MetaFrame);
 };
 
-template <class TimuData, class TcameraData, int Ncamera>
-void CameraIMUSync<TimuData,TcameraData, Ncamera>::push_backIMU(const TimuData& data)
+template <class TcameraData>
+void CameraIMUSync<TcameraData>::push_backIMU(uint64_t monotonic_time, uint64_t timeSyncIn)
 {
     // std::lock_guard<std::mutex> lock(mtx);
 
@@ -81,12 +92,11 @@ void CameraIMUSync<TimuData,TcameraData, Ncamera>::push_backIMU(const TimuData& 
     MetaFrame& frame = metaFrame[MASK(end)];
     
     frame.reset();
-    frame.imu = data;
-    frame.trigger_time = data.monotonic_time - data.timeSyncIn;
+    frame.trigger_time = monotonic_time - timeSyncIn;
     end++;
 
-    std::cout << "IMU syncIn Time " <<  data.timeSyncIn << ", index " << MASK(end - 1) << std::endl;
-    std::cout << "IMU " <<  data.monotonic_time << ", index " << MASK(end - 1) << std::endl;
+    std::cout << "IMU syncIn Time " <<  timeSyncIn << ", index " << MASK(end - 1) << std::endl;
+    std::cout << "IMU " <<  monotonic_time << ", index " << MASK(end - 1) << std::endl;
 
     if(MASK(begin) == MASK(end)){ // remove the oldest record when full
         begin++;
@@ -102,8 +112,8 @@ void CameraIMUSync<TimuData,TcameraData, Ncamera>::push_backIMU(const TimuData& 
     }
 }
 
-template <class TimuData, class TcameraData, int Ncamera>
-void CameraIMUSync<TimuData,TcameraData, Ncamera>::push_backCamera(const TcameraData& data, const uint index)
+template <class TcameraData>
+void CameraIMUSync<TcameraData>::push_backCamera(const TcameraData& data, const uint index)
 {
     std::lock_guard<std::mutex> lock(mtx);
 
@@ -150,7 +160,7 @@ void CameraIMUSync<TimuData,TcameraData, Ncamera>::push_backCamera(const Tcamera
             frame.camera[index] = data;
 
             // detect if bitMask is full
-            if (frame.isComplete())
+            if (frame.isComplete(CAMERA_MASK))
             {
                 std::cout << "IMU sync complete! for index " << MASK(i) << std::endl << std::endl;
 
@@ -180,16 +190,13 @@ void CameraIMUSync<TimuData,TcameraData, Ncamera>::push_backCamera(const Tcamera
     cam_callback_cache.push_front(std::bind(&CameraIMUSync::push_backCamera, this, data, index));
 }
 
-template <class TimuData, class TcameraData, int Ncamera>
-void CameraIMUSync<TimuData,TcameraData, Ncamera>::syncedCallback(MetaFrame frame){
+template <class TcameraData>
+void CameraIMUSync<TcameraData>::syncedCallback(MetaFrame frame){
 
     for (auto& cb : _cblist_synced){
         cb(frame);
     }
 }
-
-template <class TimuData, class TcameraData, int Ncamera>
-unsigned char CameraIMUSync<TimuData, TcameraData, Ncamera>::CAMERA_MASK = std::pow(2, Ncamera) - 1;
 
 
 #endif /* CAMERA_IMU_SYNC_HPP */

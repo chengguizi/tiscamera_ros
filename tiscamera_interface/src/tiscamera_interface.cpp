@@ -25,6 +25,9 @@ TisCameraManager::TisCameraManager(const std::string topic_ns, const std::string
     frame.data.image_data = nullptr;
 
     prop_trigger_mode = get_property("Trigger Mode");
+    prop_trigger_polarity = get_property("Trigger Polarity");
+    prop_trigger_exposure_mode = get_property("Trigger Exposure Mode");
+
     prop_exposure_mode = get_property("Exposure Auto");
     prop_exposure_time = get_property("Exposure Time (us)");
     prop_gain_mode = get_property("Gain Auto");
@@ -48,39 +51,89 @@ TisCameraManager::~TisCameraManager()
 bool TisCameraManager::set_trigger_mode(TisCameraManager::TriggerMode value)
 {
 
-    if (value == TRIGGER_RISING_EDGE)
+    // Always use trigger exposure mode as Frame start
+    std::cout << "setting trigger exposure mode to Frame Start" << std::endl;
+    if (!prop_trigger_exposure_mode->set((*this), "Frame Start"))
     {
-        std::cout << "setting trigger mode to RISING EDGE" << std::endl;
+        throw std::runtime_error("set trigger exposure mode FAILED");
+    }
 
-        if (!prop_trigger_mode->set((*this), (int)true))
-        {
-            throw std::runtime_error("set trigger mode FAILED");
-        }
-            
-    }else
+    if (value == NONE)
     {
         std::cout << "setting trigger mode to NONE" << std::endl;
 
         if (!prop_trigger_mode->set((*this), (int)false))
         {
-            throw std::runtime_error("set trigger mode FAILED");
+            throw std::runtime_error("set trigger mode to NONE FAILED");
         }
+            
+    }else
+    {
+        std::cout << "setting trigger mode to Enabled" << std::endl;
+
+        if (!prop_trigger_mode->set((*this), (int)true))
+        {
+            throw std::runtime_error("set trigger mode to True FAILED");
+        }
+
+        if (value == TRIGGER_RISING_EDGE)
+        {
+            std::cout << "setting trigger polarity to RISING EDGE" << std::endl;
+
+            if (!prop_trigger_polarity->set((*this), "Rising Edge"))
+            {
+                throw std::runtime_error("set trigger polarity FAILED");
+            }
+        }else if (value == TRIGGER_FALLING_EDGE)
+        {
+            std::cout << "setting trigger polarity to FAILLING EDGE" << std::endl;
+
+            if (!prop_trigger_polarity->set((*this), "Falling Edge"))
+            {
+                throw std::runtime_error("set trigger polarity FAILED");
+            }
+        }
+
+        
     }
+
+    // try
+    // {
+    //     prop_trigger_mode = get_property("Trigger Mode");
+    // }
+    // catch(std::exception &ex)    
+    // {
+    //     printf("Error %s : %s\n",ex.what(), "Trigger Mode");
+    //     return false;
+    // }
+
+    // std::cout  << prop_trigger_mode->to_string() << std::endl;
+
+    return true;
+}
+
+TisCameraManager::TriggerMode TisCameraManager::get_trigger_mode()
+{
+    int trigger_mode;
+    if (!prop_trigger_mode->get((*this), trigger_mode))
+    {
+        throw std::runtime_error("get trigger mode FAILED");
+    }
+
+    if (trigger_mode == 0)
+        return TriggerMode::NONE;
     
-
-    try
+    std::string trigger_polarity;
+    if (!prop_trigger_polarity->get((*this), trigger_polarity))
     {
-        prop_trigger_mode = get_property("Trigger Mode");
-    }
-    catch(std::exception &ex)    
-    {
-        printf("Error %s : %s\n",ex.what(), "Trigger Mode");
-        return false;
+        throw std::runtime_error("get trigger polarity FAILED");
     }
 
-    std::cout  << prop_trigger_mode->to_string() << std::endl;
+    if (trigger_polarity == "Rising Edge")
+        return TriggerMode::TRIGGER_RISING_EDGE;
+    else
+        return TriggerMode::TRIGGER_FALLING_EDGE;
 
-    return false;
 }
 
 bool TisCameraManager::set_exposure_gain_auto(bool value)

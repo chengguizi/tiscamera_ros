@@ -2,7 +2,7 @@
  * @Author: Cheng Huimin 
  * @Date: 2019-09-17 11:39:39 
  * @Last Modified by: Cheng Huimin
- * @Last Modified time: 2019-09-25 16:33:49
+ * @Last Modified time: 2020-06-26 17:31:03
  */
 
 #include <tiscamera_interface/tiscamera_interface.hpp>
@@ -32,7 +32,7 @@
 #endif
 
 using namespace std;
-typedef CameraIMUSync<VnDeviceCompositeData, TisCameraManager::FrameData, 2> CameraIMUSyncN;
+typedef CameraIMUSync<TisCameraManager::FrameData> CameraIMUSyncN;
 unsigned char MASK = 0;
 
 
@@ -280,6 +280,75 @@ void loadCalibration(const ros::NodeHandle &nh)
 }
 
 
+void start_camera(std::unique_ptr<TisCameraManager>& camera, const CameraParam& param, const std::string camera_ns)
+{
+    // todo: check for successful initialisation
+    
+    // std::cout << "Enable Display" << std::endl;
+    // camera->enable_video_display(gst_element_factory_make("ximagesink", NULL));
+    std::cout << "Setting Capture Format..." << std::endl;
+    // camera->set_capture_format("GRAY16_LE", gsttcam::FrameSize{1440,1080}, gsttcam::FrameRate{30,1});
+    camera->set_capture_format("GRAY16_LE", gsttcam::FrameSize{param.width,param.height}, gsttcam::FrameRate{param.gst_max_frame_rate,1}); // {1440,1080}
+    
+    if (param.exposure_mode == "manual")
+    {
+        std::cout << "Setting Exposure Mode Manual" << std::endl;
+        camera->set_exposure_gain_auto(false);
+        camera->set_exposure_time(param.initial_exposure); // in us
+        camera->set_gain(param.initial_gain);
+    }
+    else if (param.exposure_mode == "internal")
+    {
+        std::cout << "Setting Exposure Mode Auto" << std::endl;
+        camera->set_exposure_gain_auto(true);
+    }else
+    {
+        throw std::runtime_error("Unknown Exposure Mode");
+    }
+    
+    
+
+    if (param.hardware_sync_mode == "none")
+    {
+        camera->set_trigger_mode(TisCameraManager::NONE); // prior to start, the camera has to be non-triggering mode
+        camera->start();
+    }else if (param.hardware_sync_mode == "slave"){
+        
+        camera->set_trigger_mode(TisCameraManager::NONE); // prior to start, the camera has to be non-triggering mode
+        camera->start();
+        std::cout << "Camera " << camera_ns << " Hardware Sync ENABLED" << std::endl;
+        camera->set_trigger_mode(TisCameraManager::TRIGGER_RISING_EDGE);
+    }
+
+    // POST START PARAMETERS
+    //// tonemapping parameters
+    if (param.tonemapping_mode == "internal")
+    {
+        camera->set_tonemapping_mode(true);
+        camera->set_tonemapping_param(param.tonemapping_intensity, param.tonemapping_global_brightness);
+
+    }else{
+        camera->set_tonemapping_mode(false);
+    }
+
+    //// gamma
+    camera->set_gamma(param.initial_gamma);
+
+    //// highlight reduction
+    camera->set_highlight_reduction(param.highlight_reduction);
+
+    //// auto exposure settings
+    camera->set_exposure_limits(param.auto_upper_limit_exposure, param.lower_limit_exposure, param.upper_limit_exposure);
+    camera->set_gain_limits(param.lower_limit_gain, param.upper_limit_gain);
+
+    camera->set_exposure_auto_reference(param.exposure_auto_reference);
+
+    ListProperties(*camera);
+    
+
+    ROS_INFO_STREAM("Camera " << camera_ns << " Started...");
+}
+
 int main(int argc, char **argv)
 {
     
@@ -307,26 +376,31 @@ int main(int argc, char **argv)
     nh_local.getParam("sync_rate", RATE);
     // constexpr int RATE = 4; // should be divisible by 800
     
-    CameraIMUSyncN cameraImuSync;
-    cameraImuSync.set_max_slack(1.0/RATE * 0.8); // maximum slack to be 80% of the duration
-    cameraImuSync.set_imu_read_jitter(std::max(1.0/RATE * 0.1, 0.008)); // 8ms jitter allowed
+
 
     // GStreamer must be initialised before any camera usage
     gst_init(&argc, &argv);
 
     try {
-        // nh_local.setParam("sync_rate", RATE);
-        imu_vn_100::ImuVn100 imu(nh_local);
-        imu.Stream(true);
-        imu.registerCallback(std::bind(&CameraIMUSyncN::push_backIMU, &cameraImuSync, std::placeholders::_1));
+        
         
         // Initialise available camera list
 
         auto available_devices = gsttcam::get_device_list();
 
         std::vector<std::string> camera_ns_list = CameraParam::loadCameras(nh_local);
-        const int N = camera_ns_list.size();
-        assert(N == 2); // ONLY STEREO FOR NOW
+        const unsigned int N = camera_ns_list.size();
+        // assert(N == 2); // ONLY STEREO FOR NOW
+
+        CameraIMUSyncN cameraImuSync(N);
+        cameraImuSync.set_max_slack(1.0/RATE * 0.8); // maximum slack to be 80% of the duration
+        cameraImuSync.set_imu_read_jitter(std::max(1.0/RATE * 0.1, 0.008)); // 8ms jitter allowed
+
+
+        // nh_local.setParam("sync_rate", RATE);
+        imu_vn_100::ImuVn100 imu(nh_local);
+        imu.Stream(true);
+        imu.registerCallback(std::bind(&CameraIMUSyncN::push_backIMU, &cameraImuSync, std::placeholders::_1, std::placeholders::_2));
 
         size_t i = 0;
         for (auto &camera_ns : camera_ns_list)
@@ -347,76 +421,21 @@ int main(int argc, char **argv)
                 continue;
             }
 
+            
+
             std::unique_ptr<TisCameraManager> camera(new TisCameraManager (camera_ns, sn));
-            // todo: check for successful initialisation
-            
-            // std::cout << "Enable Display" << std::endl;
-            // camera->enable_video_display(gst_element_factory_make("ximagesink", NULL));
-            std::cout << "Setting Capture Format..." << std::endl;
-            // camera->set_capture_format("GRAY16_LE", gsttcam::FrameSize{1440,1080}, gsttcam::FrameRate{30,1});
-            camera->set_capture_format("GRAY16_LE", gsttcam::FrameSize{param.width,param.height}, gsttcam::FrameRate{param.gst_max_frame_rate,1}); // {1440,1080}
-            
-            if (param.exposure_mode == "manual")
-            {
-                std::cout << "Setting Exposure Mode Manual" << std::endl;
-                camera->set_exposure_gain_auto(false);
-                camera->set_exposure_time(param.initial_exposure); // in us
-                camera->set_gain(param.initial_gain);
-            }
-            else if (param.exposure_mode == "internal")
-            {
-                std::cout << "Setting Exposure Mode Auto" << std::endl;
-                camera->set_exposure_gain_auto(true);
-            }else
-            {
-                throw std::runtime_error("Unknown Exposure Mode");
-            }
-            
-            
+            start_camera(camera, param, camera_ns);
 
-            if (param.hardware_sync_mode == "none")
-            {
-                camera->set_trigger_mode(TisCameraManager::NONE); // prior to start, the camera has to be non-triggering mode
-                camera->start();
-            }else if (param.hardware_sync_mode == "slave"){
-                
-                camera->set_trigger_mode(TisCameraManager::NONE); // prior to start, the camera has to be non-triggering mode
-                camera->start();
-                std::cout << "Camera " << camera_ns << " Hardware Sync ENABLED" << std::endl;
-                camera->set_trigger_mode(TisCameraManager::TRIGGER_RISING_EDGE);
-            }
-
-            // POST START PARAMETERS
-            //// tonemapping parameters
-            if (param.tonemapping_mode == "internal")
-            {
-                camera->set_tonemapping_mode(true);
-                camera->set_tonemapping_param(param.tonemapping_intensity, param.tonemapping_global_brightness);
-
-            }else{
-                camera->set_tonemapping_mode(false);
-            }
-
-            //// gamma
-            camera->set_gamma(param.initial_gamma);
-
-            //// highlight reduction
-            camera->set_highlight_reduction(param.highlight_reduction);
-
-            //// auto exposure settings
-            camera->set_exposure_limits(param.auto_upper_limit_exposure, param.lower_limit_exposure, param.upper_limit_exposure);
-            camera->set_gain_limits(param.lower_limit_gain, param.upper_limit_gain);
-
-            camera->set_exposure_auto_reference(param.exposure_auto_reference);
-
-            ListProperties(*camera);
-            
-
-            ROS_INFO_STREAM("Camera " << camera_ns << " Started...");            
+            camera->camera_ns = camera_ns;
+            camera->hardware_sync_mode = param.hardware_sync_mode;
 
             camera_list.push_back(std::move(camera));
 
-            MASK |= 1<<i;
+
+            // if it is free running, do not add it into the sync system
+            if (param.hardware_sync_mode != "none")
+                MASK |= 1<<i;
+            
             i++;
         }
 
@@ -430,8 +449,27 @@ int main(int argc, char **argv)
 
         i = 0;
         for (auto& camera : camera_list){
-            if (camera != nullptr)
-                camera->registerCallback(std::bind(&CameraIMUSyncN::push_backCamera, &cameraImuSync, std::placeholders::_1, i));
+            if (camera != nullptr){
+                if (camera->hardware_sync_mode == "none")
+                {
+
+                }
+                else if (camera->hardware_sync_mode == "slave")
+                {
+                    camera->registerCallback(std::bind(&CameraIMUSyncN::push_backCamera, &cameraImuSync, std::placeholders::_1, i));
+                }
+                else if (camera->hardware_sync_mode == "master")
+                {
+                    // there should be only 1 master at most
+                    
+                }
+                else
+                {
+                    throw std::runtime_error("unkown hardware_sync_mode");
+                }
+                
+                
+            }
             i++;
         }
 
