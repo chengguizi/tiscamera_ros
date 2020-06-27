@@ -42,7 +42,7 @@ class TisCameraManager : public gsttcam::TcamCamera
             // payload
             unsigned char *image_data;
 
-            void release(){if (image_data) delete [] image_data;};
+            void release(){if (image_data) {delete [] image_data; image_data = nullptr;}};
         };
 
         typedef std::function<void(const FrameData&)> callbackCamera;
@@ -74,7 +74,6 @@ class TisCameraManager : public gsttcam::TcamCamera
         void registerCallback(callbackCamera cb);
 
         std::string camera_ns;
-        std::string hardware_sync_mode;
     
     private:
         bool is_streaming;

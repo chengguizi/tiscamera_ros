@@ -2,7 +2,7 @@
  * @Author: Cheng Huimin 
  * @Date: 2019-09-24 14:45:57 
  * @Last Modified by: Cheng Huimin
- * @Last Modified time: 2020-06-26 17:34:08
+ * @Last Modified time: 2020-06-26 18:30:14
  */
 #ifndef CAMERA_IMU_SYNC_HPP
 #define CAMERA_IMU_SYNC_HPP
@@ -34,7 +34,7 @@ class CameraIMUSync{
             bool isComplete(const unsigned char& CAMERA_MASK){return (cameraBitMask == CAMERA_MASK); };
         };
 
-        CameraIMUSync(int Ncamera) : Ncamera(Ncamera){
+        CameraIMUSync(int Ncamera) : Ncamera(Ncamera), imu_initialised(false){
 
             // initialise meta frame to have buffer size
             metaFrame.resize(BUFFER_SIZE);
@@ -50,7 +50,7 @@ class CameraIMUSync{
         void set_imu_read_jitter(double sec){max_imu_read_jitter = sec * 1e9;}; // maximum delay of imu buffer being read by kernel
         void set_camera_mask(const unsigned char camera_mask){CAMERA_MASK = camera_mask;};
         void push_backIMU(uint64_t monotonic_time, uint64_t timeSyncIn);
-        void push_backCamera(const TcameraData& data, const uint index);
+        void push_backCamera(const TcameraData& data, const uint index, bool master);
         
         typedef std::function<void(const MetaFrame&)> callbackSynced;
         void register_callback_synced(callbackSynced cb){_cblist_synced.push_back(cb); };
@@ -76,6 +76,7 @@ class CameraIMUSync{
 
         unsigned char begin = 0;
         unsigned char end = 0;
+        bool imu_initialised;
 
         std::vector<callbackSynced> _cblist_synced;
         void syncedCallback(const MetaFrame);
@@ -87,6 +88,9 @@ void CameraIMUSync<TcameraData>::push_backIMU(uint64_t monotonic_time, uint64_t 
     // std::lock_guard<std::mutex> lock(mtx);
 
     mtx.lock();
+
+    if (!imu_initialised)
+        imu_initialised = true;
 
     // push back the data
     MetaFrame& frame = metaFrame[MASK(end)];
@@ -113,13 +117,23 @@ void CameraIMUSync<TcameraData>::push_backIMU(uint64_t monotonic_time, uint64_t 
 }
 
 template <class TcameraData>
-void CameraIMUSync<TcameraData>::push_backCamera(const TcameraData& data, const uint index)
+void CameraIMUSync<TcameraData>::push_backCamera(const TcameraData& data, const uint index, bool master)
 {
-    std::lock_guard<std::mutex> lock(mtx);
+    std::cout << "push_backCamera() " << index << std::endl;
 
-    // std::cout << "push_backCamera() " << index << std::endl;
+    // if the camera is a master, add a fake imu measurement timing
+    if(master)
+        push_backIMU(data.capture_time_ns, 0);
+
+    if(!imu_initialised)
+        return;
+
+    std::lock_guard<std::mutex> lock(mtx);
+    
 
     assert(index < Ncamera); // must not be out of range
+
+    //// if it is to override
     assert(MASK(begin) != MASK(end));
 
     const uint64_t& camera_time = data.capture_time_ns;
@@ -187,7 +201,7 @@ void CameraIMUSync<TcameraData>::push_backCamera(const TcameraData& data, const 
     // std::function<void(const TcameraData&, const uint)> func = [](const TcameraData& data, const uint index)
 
     std::cout << "Adding camera frame " << index << " to cache..." << std::endl;
-    cam_callback_cache.push_front(std::bind(&CameraIMUSync::push_backCamera, this, data, index));
+    cam_callback_cache.push_front(std::bind(&CameraIMUSync::push_backCamera, this, data, index, false));
 }
 
 template <class TcameraData>

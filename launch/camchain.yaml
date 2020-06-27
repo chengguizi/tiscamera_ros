@@ -1,4 +1,4 @@
-cam0:
+fisheye_left:
   cam_overlaps: [1]
   camera_model: ds
   distortion_coeffs: []
@@ -7,7 +7,7 @@ cam0:
     698.7790719322672, 582.0443043963011]
   resolution: [1440, 1080]
   rostopic: /tiscamera_ros/left/image_rect_raw
-cam1:
+fisheye_right:
   T_cn_cnm1:
   - [0.9998049195331252, 0.017338652503253983, 0.009460127204568933, -0.1998643171242534]
   - [-0.01711842433342945, 0.9995915570556743, -0.022884025243553947, 0.0005345914400803443]

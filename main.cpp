@@ -2,7 +2,7 @@
  * @Author: Cheng Huimin 
  * @Date: 2019-09-17 11:39:39 
  * @Last Modified by: Cheng Huimin
- * @Last Modified time: 2020-06-26 17:31:03
+ * @Last Modified time: 2020-06-27 12:26:18
  */
 
 #include <tiscamera_interface/tiscamera_interface.hpp>
@@ -31,17 +31,17 @@
 #include <cvl/cvl.h>
 #endif
 
-using namespace std;
+
 typedef CameraIMUSync<TisCameraManager::FrameData> CameraIMUSyncN;
-unsigned char MASK = 0;
+unsigned char MASK = 0; // currently, maximum 8 cameras
+
+// publisher for individual camera, if they are free running (not synced); otherwise nullptr
+std::vector<std::shared_ptr<ImagePublisher>> _camera_pub;
+std::shared_ptr<IMUPublisher> _pub_imu;
 
 
-StereoCameraPublisher* _pub;
-IMUPublisher* _pub_imu;
-sensor_msgs::CameraInfo left_info, right_info;
-
-std::vector<std::string> CameraParam::camera_list;
-
+// it also store the camera_ns string and hardware_sync_mode variable for each camera
+std::vector<std::shared_ptr<CameraParam>> CameraParam::list;
 
 
 void ListProperties(TisCameraManager &cam)
@@ -164,123 +164,66 @@ cv::Mat do_tonemapping(cvl_frame_t* frame, void* srcptr_raw, float max_abs_lum)
     return mat;
 }
 
-// template <class TimuData, class TcameraData, int Ncamera>
-void callbackSynced_handler(CameraIMUSyncN::MetaFrame frame)
+inline void publish_image(const TisCameraManager::FrameData& frame, size_t index, uint64_t trigger_time)
 {
 
-    // following code from /cvl-mirror/cvtool/doc/cvl.html
-    static cvl_gl_context_t *gl_context = nullptr;
-    static cvl_frame_t* _tmpframe = nullptr;
-    // cvl_frame_t *input_frame, *output_frame;
+    assert(frame.image_data != nullptr);
 
-    // cvl_frame_t * _tmpframe = cvl_frame_new(20, 10, 
-    //         3, CVL_XYZ, CVL_FLOAT16, CVL_MEM);
-
+    //// following code from /cvl-mirror/cvtool/doc/cvl.html
+    // static cvl_gl_context_t *gl_context = nullptr;
+    // static cvl_frame_t* _tmpframe = nullptr;
     
-    // convert data to cv::Mat
+    //// convert data to cv::Mat
 
-    auto& left_frame = frame.camera[0];
-    auto& right_frame = frame.camera[1];
+    // if (!_tmpframe)
+    // {
+    //     /* Create a GL context on display ":0" and activate it. */
+    //     gl_context = cvl_gl_context_new(":0");
+    //     if (!gl_context)
+    //     {
+    //         fprintf(stderr, "Cannot create GL context.\n");
+    //         abort();
+    //     }
 
-    if (!_tmpframe)
-    {
-        /* Create a GL context on display ":0" and activate it. */
-        gl_context = cvl_gl_context_new(":0");
-        if (!gl_context)
-        {
-            fprintf(stderr, "Cannot create GL context.\n");
-            abort();
-        }
+    //     cvl_init();
 
-        cvl_init();
-
-        std::cout << "initialising cvl buffer" << left_frame.width << ", " << left_frame.height << std::endl;
-        _tmpframe = cvl_frame_new(left_frame.width, left_frame.height, 3, CVL_XYZ, CVL_FLOAT16, CVL_MEM); // OR CVL_FLOAT
-    }
+    //     std::cout << "initialising cvl buffer" << frame.width << ", " << frame.height << std::endl;
+    //     _tmpframe = cvl_frame_new(left_frame.width, left_frame.height, 3, CVL_XYZ, CVL_FLOAT16, CVL_MEM); // OR CVL_FLOAT
+    // }
 
     // cv::Mat frame_ret_l = do_tonemapping(_tmpframe, left_frame.image_data, 65535);
     
     // auto left = frame_ret_l;
-    auto left = cv::Mat(cv::Size(left_frame.width, left_frame.height), CV_16UC1, left_frame.image_data, cv::Mat::AUTO_STEP);
-    auto right = cv::Mat(cv::Size(right_frame.width, right_frame.height), CV_16UC1, right_frame.image_data, cv::Mat::AUTO_STEP);
-    
+    auto image_cv = cv::Mat(cv::Size(frame.width, frame.height), CV_16UC1, frame.image_data, cv::Mat::AUTO_STEP);
 
-    
+    assert(_camera_pub[index] != nullptr);
 
-    // (const cv::Mat imageLeft_cv,const cv::Mat imageRight_cv, const std::string encoding, const sensor_msgs::CameraInfo cameraInfo_left, const sensor_msgs::CameraInfo cameraInfo_right, const ros::Time sensor_timestamp);
-    _pub->publish(left, right, "mono16", left_info, right_info, ros::Time().fromNSec(frame.trigger_time));
-    // .camera_sn
-    return;
+    _camera_pub[index]->publish(image_cv, "mono16", CameraParam::list[index]->camera_info, ros::Time().fromNSec(trigger_time));
 }
 
-
-
-// void loadParam(const std::string& topic_ns)
-// {
-//     ros::NodeHandle nh_local("~/" + topic_ns);
-//     nh_local.getParam("initial_exposure", initial_exposure);
-//     nh_local.getParam("initial_gain", initial_gain);
-//     std::cout << "initial_exposure = " << initial_exposure << std::endl;
-//     std::cout << "initial_gain = " << initial_gain << std::endl;
-// }
-
-void loadCalibration(const ros::NodeHandle &nh)
+void callbackIndividual_handler(const TisCameraManager::FrameData& data, const size_t index)
 {
-    // uint32 height
-    // uint32 width
-    // string distortion_model
-    // float64[9]  K # 6  
-    // float64[12] P 
-    nh.param<string>("cam0/distortion_model",
-      left_info.distortion_model, string("ds"));
-    nh.param<string>("cam1/distortion_model",
-      right_info.distortion_model, string("ds"));
-
-    vector<int> cam0_resolution_temp(2);
-    nh.getParam("cam0/resolution", cam0_resolution_temp);
-    left_info.width = cam0_resolution_temp[0];
-    left_info.height = cam0_resolution_temp[1];
-
-    vector<int> cam1_resolution_temp(2);
-    nh.getParam("cam1/resolution", cam1_resolution_temp);
-    right_info.width = cam1_resolution_temp[0];
-    right_info.height = cam1_resolution_temp[1];
-
-    vector<double> cam0_intrinsics_temp(6);
-    nh.getParam("cam0/intrinsics", cam0_intrinsics_temp);
-    left_info.K[0] = cam0_intrinsics_temp[0];
-    left_info.K[1] = cam0_intrinsics_temp[1];
-    left_info.K[2] = cam0_intrinsics_temp[2];
-    left_info.K[3] = cam0_intrinsics_temp[3];
-    left_info.K[4] = cam0_intrinsics_temp[4];
-    left_info.K[5] = cam0_intrinsics_temp[5];
-
-    vector<double> cam1_intrinsics_temp(6);
-    nh.getParam("cam1/intrinsics", cam1_intrinsics_temp);
-    right_info.K[0] = cam1_intrinsics_temp[0];
-    right_info.K[1] = cam1_intrinsics_temp[1];
-    right_info.K[2] = cam1_intrinsics_temp[2];
-    right_info.K[3] = cam1_intrinsics_temp[3];
-    right_info.K[4] = cam1_intrinsics_temp[4];
-    right_info.K[5] = cam1_intrinsics_temp[5];
-
-    cv::Mat T_cam0_cam1 = utils::getTransformCV(nh, "cam1/T_cn_cnm1");
-    right_info.P[0] = T_cam0_cam1.at<double>(0, 0);
-    right_info.P[1] = T_cam0_cam1.at<double>(0, 1);
-    right_info.P[2] = T_cam0_cam1.at<double>(0, 2);
-    right_info.P[3] = T_cam0_cam1.at<double>(0, 3);
-    right_info.P[4] = T_cam0_cam1.at<double>(1, 0);
-    right_info.P[5] = T_cam0_cam1.at<double>(1, 1);
-    right_info.P[6] = T_cam0_cam1.at<double>(1, 2);
-    right_info.P[7] = T_cam0_cam1.at<double>(1, 3);
-    right_info.P[8] = T_cam0_cam1.at<double>(2, 0);
-    right_info.P[9] = T_cam0_cam1.at<double>(2, 1);
-    right_info.P[10] = T_cam0_cam1.at<double>(2, 2);
-    right_info.P[11] = T_cam0_cam1.at<double>(2, 3);
+    // use capture time as the 'trigger time', as the camera is free running
+    publish_image(data, index, data.capture_time_ns);
 }
 
 
-void start_camera(std::unique_ptr<TisCameraManager>& camera, const CameraParam& param, const std::string camera_ns)
+void callbackSynced_handler(CameraIMUSyncN::MetaFrame frame)
+{
+    for (size_t i = 0; i < frame.camera.size(); i++){
+
+        // skip cameras that are not in the sync group
+        if (frame.cameraBitMask & i){
+            publish_image(frame.camera[i], i, frame.trigger_time);
+        }
+            
+    }
+}
+
+
+
+
+void start_camera(std::unique_ptr<TisCameraManager>& camera, const CameraParam& param)
 {
     // todo: check for successful initialisation
     
@@ -316,8 +259,14 @@ void start_camera(std::unique_ptr<TisCameraManager>& camera, const CameraParam& 
         
         camera->set_trigger_mode(TisCameraManager::NONE); // prior to start, the camera has to be non-triggering mode
         camera->start();
-        std::cout << "Camera " << camera_ns << " Hardware Sync ENABLED" << std::endl;
+        std::cout << "Camera " << param.camera_ns << " Hardware Sync ENABLED" << std::endl;
         camera->set_trigger_mode(TisCameraManager::TRIGGER_RISING_EDGE);
+    }else if (param.hardware_sync_mode == "master"){
+        camera->set_trigger_mode(TisCameraManager::NONE); // prior to start, the camera has to be non-triggering mode
+        camera->start();
+    }else
+    {
+        throw std::runtime_error("Unknown hardware_sync_mode");
     }
 
     // POST START PARAMETERS
@@ -346,7 +295,7 @@ void start_camera(std::unique_ptr<TisCameraManager>& camera, const CameraParam& 
     ListProperties(*camera);
     
 
-    ROS_INFO_STREAM("Camera " << camera_ns << " Started...");
+    ROS_INFO_STREAM("Camera " << param.camera_ns << " Started...");
 }
 
 int main(int argc, char **argv)
@@ -355,132 +304,161 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "tiscamera_ros");
     ros::NodeHandle nh_local("~");
 
-    // Loading ROS Paramters
-    loadCalibration(ros::NodeHandle("~/calibration")); //  write to left_info, right_info
-
-
     // Initialise publishers
-    _pub = new StereoCameraPublisher(nh_local);
-    _pub_imu = new IMUPublisher(nh_local);
 
-    // list of cameras
+    _pub_imu.reset(new IMUPublisher(nh_local));
 
-    std::vector<std::unique_ptr<TisCameraManager>> camera_list;
-
-    // camera_ns_list.push_back("30914056"); // left
-    // camera_ns_list.push_back("30914060"); // right
+    // store the list of cameras, those failed to initialise will have nullptr
+    std::vector<std::unique_ptr<TisCameraManager>> tiscamera_list;
 
 
     // sync struct
     int RATE;
     nh_local.getParam("sync_rate", RATE);
-    // constexpr int RATE = 4; // should be divisible by 800
-    
+    ROS_INFO_STREAM("IMU sync rate (slave mode) is " << RATE << "fps");
 
 
     // GStreamer must be initialised before any camera usage
     gst_init(&argc, &argv);
 
+    bool has_master = false;
+    bool has_slave = false;
+
+    std::shared_ptr<CameraIMUSyncN> cameraImuSync;
+    std::shared_ptr<imu_vn_100::ImuVn100> imu;
+
+    std::cout << "Discovering Cameras..." << std::endl;
+
     try {
-        
-        
+
         // Initialise available camera list
 
         auto available_devices = gsttcam::get_device_list();
 
-        std::vector<std::string> camera_ns_list = CameraParam::loadCameras(nh_local);
-        const unsigned int N = camera_ns_list.size();
-        // assert(N == 2); // ONLY STEREO FOR NOW
+        CameraParam::loadCameras(nh_local);
+        const unsigned int N = CameraParam::list.size();
+        assert(N <= 8);
 
-        CameraIMUSyncN cameraImuSync(N);
-        cameraImuSync.set_max_slack(1.0/RATE * 0.8); // maximum slack to be 80% of the duration
-        cameraImuSync.set_imu_read_jitter(std::max(1.0/RATE * 0.1, 0.008)); // 8ms jitter allowed
+        _camera_pub.resize(N);
 
+        cameraImuSync.reset(new CameraIMUSyncN(N));
+        cameraImuSync->set_max_slack(1.0/RATE * 0.8); // maximum slack to be 80% of the duration
+        cameraImuSync->set_imu_read_jitter(std::max(1.0/RATE * 0.1, 0.008)); // 8ms jitter allowed
 
-        // nh_local.setParam("sync_rate", RATE);
-        imu_vn_100::ImuVn100 imu(nh_local);
-        imu.Stream(true);
-        imu.registerCallback(std::bind(&CameraIMUSyncN::push_backIMU, &cameraImuSync, std::placeholders::_1, std::placeholders::_2));
-
-        size_t i = 0;
-        for (auto &camera_ns : camera_ns_list)
+        
+        for (size_t i = 0; i < CameraParam::list.size(); i++)
         {
-            CameraParam param;
-            param.loadParam(camera_ns);
-            param.loadExposureControlParam(param.type);
+            auto &param = CameraParam::list[i];
+            auto &pub = _camera_pub[i];
 
-            auto& sn = param.camera_sn;
+            std::cout << std::endl << "Loading Camera No. " << i  << ": " << param->camera_ns << std::endl;
+            pub.reset();
+            param->loadCalibration(ros::NodeHandle("~/calibration")); //  write to left_info, right_info
+            param->loadParam(param->camera_ns);
+            param->loadExposureControlParam(param->type);
+
+            auto& sn = param->camera_sn;
             // Skip non-existent cameras
             if (
                 available_devices.end() == std::find_if(available_devices.begin(), available_devices.end(), [&sn](gsttcam::CameraInfo& device){ return sn == device.serial;})
             )
             {
-                ROS_WARN_STREAM(camera_ns << "is not detected, skipping");
-                camera_list.push_back(std::unique_ptr<TisCameraManager>());
-                assert(camera_list.back() == nullptr);
+                ROS_WARN_STREAM(param->camera_ns << "is not detected, skipping");
+                tiscamera_list.push_back(std::unique_ptr<TisCameraManager>());
+                assert(tiscamera_list.back() == nullptr);
                 continue;
             }
 
             
 
-            std::unique_ptr<TisCameraManager> camera(new TisCameraManager (camera_ns, sn));
-            start_camera(camera, param, camera_ns);
+            std::unique_ptr<TisCameraManager> camera(new TisCameraManager (param->camera_ns, sn));
+            start_camera(camera, *param);
 
-            camera->camera_ns = camera_ns;
-            camera->hardware_sync_mode = param.hardware_sync_mode;
+            camera->camera_ns = param->camera_ns; // for convenience
 
-            camera_list.push_back(std::move(camera));
-
+            tiscamera_list.push_back(std::move(camera));
 
             // if it is free running, do not add it into the sync system
-            if (param.hardware_sync_mode != "none")
+            if (param->hardware_sync_mode != "none")
                 MASK |= 1<<i;
-            
-            i++;
+
+
+            pub.reset( new ImagePublisher(nh_local, param->camera_ns));
         }
 
-        // std::cout  << " MASK=" << (int)MASK << std::endl;
+        std::cout << "Discovering Cameras [DONE]" << std::endl;
 
-        cameraImuSync.set_camera_mask(MASK);
 
-        cameraImuSync.register_callback_synced(callbackSynced_handler);
+        cameraImuSync->set_camera_mask(MASK);
+        std::cout  << " MASK=" << (int)MASK << std::endl;
+        
+        cameraImuSync->register_callback_synced(callbackSynced_handler);
 
         ros::Duration(0.5).sleep();
 
-        i = 0;
-        for (auto& camera : camera_list){
-            if (camera != nullptr){
-                if (camera->hardware_sync_mode == "none")
-                {
+        std::cout << "Registering Callbacks..." << std::endl;
 
-                }
-                else if (camera->hardware_sync_mode == "slave")
+        for (size_t i = 0; i < CameraParam::list.size(); i++){
+            
+            auto& camera = tiscamera_list[i];
+            auto& param = CameraParam::list[i];
+
+            
+            
+            if (camera != nullptr){
+                std::cout << "processing " << param->camera_ns << std::endl;
+                assert(param->camera_ns == camera->camera_ns);
+                if (param->hardware_sync_mode == "none")
                 {
-                    camera->registerCallback(std::bind(&CameraIMUSyncN::push_backCamera, &cameraImuSync, std::placeholders::_1, i));
+                    // here we should give callback to individual ros publish topics.
+                    camera->registerCallback(std::bind(callbackIndividual_handler, std::placeholders::_1, i));
                 }
-                else if (camera->hardware_sync_mode == "master")
+                else if (param->hardware_sync_mode == "slave")
                 {
-                    // there should be only 1 master at most
-                    
+                    has_slave = true;
+                    camera->registerCallback(std::bind(&CameraIMUSyncN::push_backCamera, cameraImuSync, std::placeholders::_1, i, false));
+                }
+                else if (param->hardware_sync_mode == "master")
+                {
+                    has_master = true;
+                    // there should be only 1 master at most, the master will act as a fake IMU
+                    camera->registerCallback(std::bind(&CameraIMUSyncN::push_backCamera, cameraImuSync, std::placeholders::_1, i, true));
                 }
                 else
                 {
                     throw std::runtime_error("unkown hardware_sync_mode");
                 }
                 
-                
+            }else{
+                std::cout << "skipping " << param->camera_ns << std::endl;
             }
-            i++;
+
+        }
+
+        std::cout << "Registering Callbacks [Done]" << std::endl;
+
+        //// Launch external IMU if needed
+        if (has_slave && !has_master){
+            std::cout << "launching external IMU unit" << std::endl;
+            imu.reset(new imu_vn_100::ImuVn100(nh_local));
+            imu->Stream(true);
+            imu->registerCallback(std::bind(&CameraIMUSyncN::push_backIMU, cameraImuSync, std::placeholders::_1, std::placeholders::_2));
+        }else{
+            std::cout << "skipping launching external IMU unit" << std::endl;
         }
 
         ros::spin();
 
-        for (auto& camera : camera_list)
+        for (auto& camera : tiscamera_list)
             camera->stop();
 
     } catch (const std::exception& e) {
         ROS_INFO("%s: %s", nh_local.getNamespace().c_str(), e.what());
     }
+
+    
+
+    
 
     return 0;
 }

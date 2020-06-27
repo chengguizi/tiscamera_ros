@@ -2,7 +2,7 @@
  * @Author: Cheng Huimin 
  * @Date: 2019-09-13 14:33:01 
  * @Last Modified by: Cheng Huimin
- * @Last Modified time: 2019-09-24 18:01:56
+ * @Last Modified time: 2020-06-27 10:45:37
  */
 
 #include "tiscamera_interface.hpp"
@@ -497,7 +497,7 @@ TisCameraManager::FrameData TisCameraManager::getNextFrame()
     }
 
     FrameData ret_data = frame.data; 
-    frame.data.image_data = nullptr; // make the next frame to take a new memory space
+    frame.data.image_data = nullptr; // make the next frame to take a new memory space (not releasing!)
 
     return ret_data;
 }

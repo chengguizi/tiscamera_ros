@@ -5,7 +5,13 @@ namespace utils {
 
 cv::Mat getTransformCV(const ros::NodeHandle &nh,
                        const std::string &field) {
-  cv::Mat T;
+  cv::Mat T = cv::Mat::eye(4, 4, CV_64FC1);
+
+  if(!nh.hasParam(field)){
+    ROS_INFO_STREAM( field << " has Identity transformation.");
+    return T;
+  }
+
   try {
     // first try reading kalibr format
     T = getKalibrStyleTransform(nh, field);

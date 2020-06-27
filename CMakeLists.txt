@@ -2,8 +2,8 @@
 cmake_minimum_required(VERSION 3.5)
 project(tiscamera_ros)
 
-# enable C++11 standard (current directory scope)
-set(CMAKE_CXX_STANDARD 11)
+# enable C++17 standard (current directory scope)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # configure build types and build c-flags

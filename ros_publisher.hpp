@@ -39,7 +39,7 @@ class ImagePublisher
         ImagePublisher();
         ImagePublisher(const ros::NodeHandle& nh, const std::string topic);
 
-        void publish(const cv::Mat depth_cv, const std::string encoding, const sensor_msgs::CameraInfo info, const ros::Time sensor_timestamp);
+        void publish(const cv::Mat image_cv, const std::string encoding, const sensor_msgs::CameraInfo info, const ros::Time sensor_timestamp);
 
     private:
         ros::NodeHandle _nh;
