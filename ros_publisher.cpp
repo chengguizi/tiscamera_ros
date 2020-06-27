@@ -66,7 +66,7 @@ ImagePublisher::ImagePublisher()
 ImagePublisher::ImagePublisher(const ros::NodeHandle& nh, const std::string topic) : _nh(nh)
 {
     _it = new image_transport::ImageTransport(_nh);
-    _pub = new auto( _it->advertiseCamera(topic, BUFFER_SIZE) );
+    _pub = new auto( _it->advertiseCamera(topic + "/image_rect_raw", BUFFER_SIZE) );
     std::cout << topic << " Publisher initialised." << std::endl;
 }
 

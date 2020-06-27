@@ -2,7 +2,7 @@
  * @Author: Cheng Huimin 
  * @Date: 2019-09-13 14:33:01 
  * @Last Modified by: Cheng Huimin
- * @Last Modified time: 2020-06-27 10:45:37
+ * @Last Modified time: 2020-06-27 19:32:09
  */
 
 #include "tiscamera_interface.hpp"
@@ -434,20 +434,24 @@ GstFlowReturn TisCameraManager::setFrame(GstAppSink *appsink, gpointer data)
         }
 
         std::memcpy(frame.data.image_data, info.data, frame.data.width * frame.data.height * frame.data.bytes_per_pixel);
+        frame.data.initialised = true;
+
         
         // Calling Unref is important!
         gst_buffer_unmap (buffer, &info);
         gst_sample_unref(sample);
 
-        // std::cout << frame.data.topic_ns << " " << frame.data.capture_time_ns  << " frame " << frame.data.frame_count << std::endl;
+        
 
+        // std::cout << frame.data.topic_ns << " " << frame.data.capture_time_ns  << " frame " << frame.data.frame_count << std::endl;
+        
         if (_cblist_camera.size())
         {
             for (auto& cb : _cblist_camera)
                 cb(frame.data);
         }
 
-        frame.data.initialised = true;
+        
 
         frame.mtx.unlock();
         frame.con.notify_all();
@@ -498,6 +502,7 @@ TisCameraManager::FrameData TisCameraManager::getNextFrame()
 
     FrameData ret_data = frame.data; 
     frame.data.image_data = nullptr; // make the next frame to take a new memory space (not releasing!)
+    frame.data.initialised = false;
 
     return ret_data;
 }

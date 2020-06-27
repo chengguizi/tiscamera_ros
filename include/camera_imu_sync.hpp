@@ -2,7 +2,7 @@
  * @Author: Cheng Huimin 
  * @Date: 2019-09-24 14:45:57 
  * @Last Modified by: Cheng Huimin
- * @Last Modified time: 2020-06-26 18:30:14
+ * @Last Modified time: 2020-06-27 19:45:54
  */
 #ifndef CAMERA_IMU_SYNC_HPP
 #define CAMERA_IMU_SYNC_HPP
@@ -119,7 +119,9 @@ void CameraIMUSync<TcameraData>::push_backIMU(uint64_t monotonic_time, uint64_t 
 template <class TcameraData>
 void CameraIMUSync<TcameraData>::push_backCamera(const TcameraData& data, const uint index, bool master)
 {
-    std::cout << "push_backCamera() " << index << std::endl;
+    // std::cout << "push_backCamera() " << index << std::endl;
+
+    assert(data.initialised);
 
     // if the camera is a master, add a fake imu measurement timing
     if(master)
@@ -172,6 +174,8 @@ void CameraIMUSync<TcameraData>::push_backCamera(const TcameraData& data, const 
             frame.cameraBitMask = frame.cameraBitMask | bit;
             // TODO: currently, this only works if the sync is completed, before the next batch of frames comes. But this is normally the case
             frame.camera[index] = data;
+
+            assert(frame.camera[index].initialised);
 
             // detect if bitMask is full
             if (frame.isComplete(CAMERA_MASK))

@@ -2,7 +2,7 @@
  * @Author: Cheng Huimin 
  * @Date: 2019-09-17 11:39:39 
  * @Last Modified by: Cheng Huimin
- * @Last Modified time: 2020-06-27 12:26:18
+ * @Last Modified time: 2020-06-27 19:44:36
  */
 
 #include <tiscamera_interface/tiscamera_interface.hpp>
@@ -167,7 +167,7 @@ cv::Mat do_tonemapping(cvl_frame_t* frame, void* srcptr_raw, float max_abs_lum)
 inline void publish_image(const TisCameraManager::FrameData& frame, size_t index, uint64_t trigger_time)
 {
 
-    assert(frame.image_data != nullptr);
+    assert(frame.initialised);
 
     //// following code from /cvl-mirror/cvtool/doc/cvl.html
     // static cvl_gl_context_t *gl_context = nullptr;
@@ -208,12 +208,12 @@ void callbackIndividual_handler(const TisCameraManager::FrameData& data, const s
 }
 
 
-void callbackSynced_handler(CameraIMUSyncN::MetaFrame frame)
+void callbackSynced_handler(const CameraIMUSyncN::MetaFrame& frame)
 {
     for (size_t i = 0; i < frame.camera.size(); i++){
 
         // skip cameras that are not in the sync group
-        if (frame.cameraBitMask & i){
+        if (frame.cameraBitMask & 1<<i){
             publish_image(frame.camera[i], i, frame.trigger_time);
         }
             
