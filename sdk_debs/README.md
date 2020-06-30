@@ -1,0 +1,1 @@
+Note: for TX2 platform, it is recommended to compile from source, for the tiscamera package, other than installing from deb packages directly.

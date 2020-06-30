@@ -68,6 +68,7 @@ If the maximum absolute luminance is not known, the parameter can be used to pre
 
 */
 
+#ifdef TONEMAPPING
 // to memory copy the data from srcptr_raw to frame, and convert to rgb (xyz) float, before processing
 cv::Mat do_tonemapping(cvl_frame_t* frame, void* srcptr_raw, float max_abs_lum)
 {
@@ -163,6 +164,7 @@ cv::Mat do_tonemapping(cvl_frame_t* frame, void* srcptr_raw, float max_abs_lum)
 
     return mat;
 }
+#endif
 
 inline void publish_image(const TisCameraManager::FrameData& frame, size_t index, uint64_t trigger_time)
 {

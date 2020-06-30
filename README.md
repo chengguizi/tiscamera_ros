@@ -1,8 +1,9 @@
 # ROS Wrapper for TIS Camera
 
 ## Dependencies
-- https://github.com/TheImagingSource/tiscamera
-- https://github.com/chengguizi/imu_vn_100
+- The Linux SDK for The Imaging Source cameras.
+  - Current release [v0.12.0](https://github.com/TheImagingSource/tiscamera/releases) 
+- (optional, for external IMU triggering) https://github.com/chengguizi/imu_vn_100
 - Remember to enable serial access, by adding current user to `dialout` group
 
 ## Get Started

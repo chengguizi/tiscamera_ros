@@ -1,0 +1,9 @@
+<launch>
+    <node  pkg="tiscamera_ros" name="tiscamera_ros" type="tiscamera_ros" output="screen">
+        <!-- // should be divisible by 800  -->
+        <param name="sync_rate" type="int" value="10"/>
+        <rosparam file="$(find tiscamera_ros)/launch/device_list_23.yaml"/>
+        <rosparam file="$(find tiscamera_ros)/launch/param_37UX273_ML_23.yaml" ns="37UX273_ML"/>
+        <rosparam file="$(find tiscamera_ros)/launch/camchain.yaml" ns="calibration"/>
+    </node>
+</launch>

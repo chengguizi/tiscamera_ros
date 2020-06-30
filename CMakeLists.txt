@@ -16,7 +16,7 @@ endif()
 message(STATUS "CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
 
 
-set(WITH_TONEMAPPING_FLAG ON)
+set(WITH_TONEMAPPING_FLAG OFF)
 
 if(WITH_TONEMAPPING_FLAG)
   message(WARNING "Build with Tonemapping")
