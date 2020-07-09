@@ -43,8 +43,10 @@ find_package(catkin REQUIRED COMPONENTS
   image_transport
   cv_bridge
   imu_vn_100
+  mavros
 )
 
+# running dependency
 catkin_package(
   # INCLUDE_DIRS 
   # LIBRARIES 

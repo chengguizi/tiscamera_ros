@@ -2,7 +2,7 @@
  * @Author: Cheng Huimin 
  * @Date: 2019-09-17 11:39:39 
  * @Last Modified by: Cheng Huimin
- * @Last Modified time: 2020-06-27 19:44:36
+ * @Last Modified time: 2020-07-02 19:25:30
  */
 
 #include <tiscamera_interface/tiscamera_interface.hpp>
@@ -21,6 +21,8 @@
 #include <sensor_msgs/image_encodings.h>
 
 #include "camera_imu_sync.hpp"
+#include "camera_trigger_subscriber.hpp"
+
 #include "ros_publisher.hpp"
 #include "utils.hpp"
 
@@ -304,6 +306,7 @@ int main(int argc, char **argv)
 {
     
     ros::init(argc, argv, "tiscamera_ros");
+    ros::NodeHandle nh;
     ros::NodeHandle nh_local("~");
 
     // Initialise publishers
@@ -316,8 +319,11 @@ int main(int argc, char **argv)
 
     // sync struct
     int RATE;
+    std::string IMU_SOURCE;
     nh_local.getParam("sync_rate", RATE);
+    nh_local.getParam("imu_source", IMU_SOURCE);
     ROS_INFO_STREAM("IMU sync rate (slave mode) is " << RATE << "fps");
+    ROS_INFO_STREAM("IMU source is from" << IMU_SOURCE);
 
 
     // GStreamer must be initialised before any camera usage
@@ -327,7 +333,8 @@ int main(int argc, char **argv)
     bool has_slave = false;
 
     std::shared_ptr<CameraIMUSyncN> cameraImuSync;
-    std::shared_ptr<imu_vn_100::ImuVn100> imu;
+    std::shared_ptr<imu_vn_100::ImuVn100> imu_vn100;
+    std::shared_ptr<CamIMUStampSubscriber> imu_mavros;
 
     std::cout << "Discovering Cameras..." << std::endl;
 
@@ -441,10 +448,21 @@ int main(int argc, char **argv)
 
         //// Launch external IMU if needed
         if (has_slave && !has_master){
-            std::cout << "launching external IMU unit" << std::endl;
-            imu.reset(new imu_vn_100::ImuVn100(nh_local));
-            imu->Stream(true);
-            imu->registerCallback(std::bind(&CameraIMUSyncN::push_backIMU, cameraImuSync, std::placeholders::_1, std::placeholders::_2));
+            std::cout << "launching external IMU unit " << IMU_SOURCE << std::endl;
+
+            if(IMU_SOURCE == "vn-100"){
+                imu_vn100.reset(new imu_vn_100::ImuVn100(nh_local));
+                imu_vn100->Stream(true);
+                imu_vn100->registerCallback(std::bind(&CameraIMUSyncN::push_backIMU, cameraImuSync, std::placeholders::_1, std::placeholders::_2));
+            }
+            else if(IMU_SOURCE == "mavros"){
+                imu_mavros.reset(new CamIMUStampSubscriber(nh,"/mavros/cam_imu_sync/cam_imu_stamp"));
+                imu_mavros->registerCallback(std::bind(&CameraIMUSyncN::push_backIMU, cameraImuSync, std::placeholders::_1, std::placeholders::_2));
+
+            }else{
+                throw std::runtime_error("Unkown IMU_SOURCE type");
+            }
+            
         }else{
             std::cout << "skipping launching external IMU unit" << std::endl;
         }
