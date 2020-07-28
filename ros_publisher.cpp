@@ -75,6 +75,8 @@ void ImagePublisher::publish(cv::Mat image_cv, const std::string encoding, senso
     std_msgs::Header header;
     header.stamp = sensor_timestamp;
 
+    info.header.stamp = sensor_timestamp;
+
     sensor_msgs::CameraInfoConstPtr cameraInfoPtr = boost::make_shared<sensor_msgs::CameraInfo>(info);
 
     // publish left image
