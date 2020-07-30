@@ -10,7 +10,7 @@ fisheye_left:
   tonemapping_intensity: 6 # [-8,8]
   tonemapping_global_brightness: 0.5 # [0,1]
   highlight_reduction: true
-  hardware_sync_mode: none
+  hardware_sync_mode: slave
 
 fisheye_right:
   type: 37UX273_ML
@@ -20,4 +20,4 @@ fisheye_right:
   tonemapping_intensity: 6 # [-8,8]
   tonemapping_global_brightness: 0.5 # [0,1]
   highlight_reduction: true
-  hardware_sync_mode: none
+  hardware_sync_mode: slave
