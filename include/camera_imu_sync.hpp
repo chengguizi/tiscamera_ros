@@ -34,7 +34,7 @@ class CameraIMUSync{
             bool isComplete(const unsigned char& CAMERA_MASK){return (cameraBitMask == CAMERA_MASK); };
         };
 
-        CameraIMUSync(int Ncamera) : Ncamera(Ncamera), imu_initialised(false){
+        CameraIMUSync(int Ncamera) : Ncamera(Ncamera), imu_initialised(false), camera_initialised(false){
 
             // initialise meta frame to have buffer size
             metaFrame.resize(BUFFER_SIZE);
@@ -75,8 +75,9 @@ class CameraIMUSync{
         std::forward_list<std::function<void(const TcameraData&, const uint)>> cam_callback_cache;
 
         unsigned char begin = 0;
-        unsigned char end = 0;
+        unsigned char end = 0; // one plus the end index
         bool imu_initialised;
+        bool camera_initialised;
 
         std::vector<callbackSynced> _cblist_synced;
         void syncedCallback(const MetaFrame);
@@ -126,6 +127,14 @@ void CameraIMUSync<TcameraData>::push_backCamera(const TcameraData& data, const 
     // if the camera is a master, add a fake imu measurement timing
     if(master)
         push_backIMU(data.capture_time_ns, 0);
+
+    if (!camera_initialised){
+        camera_initialised = true;
+
+        // only keep the latest imu
+        if (imu_initialised)
+            begin = MASK(end - 1);
+    }
 
     if(!imu_initialised)
         return;
@@ -186,9 +195,17 @@ void CameraIMUSync<TcameraData>::push_backCamera(const TcameraData& data, const 
                     std::cerr << "[[[[[WARNING: Skipping " << MASK(i-begin) << " IMU data]]]]]" << std::endl;
                 }
 
-                begin = MASK(i+1);
+                
 
                 syncedCallback(frame);
+
+                // reset all frames before this successful sync
+                while (begin != MASK(i+1)){
+                    metaFrame[begin].reset();
+                    begin = MASK(begin+1);
+                }
+
+                std::cout << "remaining data in buffer after success sync " << MASK(end - begin) << std::endl;
 
                 frame.reset();
             }

@@ -417,7 +417,7 @@ GstFlowReturn TisCameraManager::setFrame(GstAppSink *appsink, gpointer data)
 
         //// Obtain buffer info
         GstMapInfo info;
-        gst_buffer_map(buffer, &info, GST_MAP_READ);
+        gst_buffer_map(buffer, &info, GST_MAP_READ); // read-only
 
         // buffer should match caps
         assert( (int)info.size == frame.data.width * frame.data.height * frame.data.bytes_per_pixel);
@@ -433,6 +433,8 @@ GstFlowReturn TisCameraManager::setFrame(GstAppSink *appsink, gpointer data)
             frame.data.image_data = new unsigned char[info.size];
         }
 
+        // we make a deep copy of the image from the GStreamer buffer to our local buffer
+        // This buffer is reused everytime
         std::memcpy(frame.data.image_data, info.data, frame.data.width * frame.data.height * frame.data.bytes_per_pixel);
         frame.data.initialised = true;
 
