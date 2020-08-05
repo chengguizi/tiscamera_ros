@@ -9,6 +9,9 @@
 
 #include <memory>
 
+#include <cassert>
+
+#include <cstring>
 
 class TisCameraManager : public gsttcam::TcamCamera
 {
@@ -20,32 +23,65 @@ class TisCameraManager : public gsttcam::TcamCamera
             TRIGGER_FALLING_EDGE
         };
 
-        struct FrameData{
-            bool initialised = false;
+        class FrameData{
+            public:
 
-            // Static info
-            std::string topic_ns;
-            std::string camera_sn;
-            int width;
-            int height;
-            int bytes_per_pixel;
-            std::string pixel_format;
+                // Static info
+                std::string topic_ns;
+                std::string camera_sn;
+                int width;
+                int height;
+                int bytes_per_pixel;
+                std::string pixel_format;
 
-            // Gstreamer Metadata
-            unsigned long meta_api = 0;
-            uint64_t frame_count;
-            uint64_t frames_dropped;
-            uint64_t capture_time_ns;
-            double framerate;
-            int is_damaged; // gboolean is implemented as int
+                // Gstreamer Metadata
+                unsigned long meta_api = 0;
+                uint64_t frame_count;
+                uint64_t frames_dropped;
+                uint64_t capture_time_ns;
+                double framerate;
+                int is_damaged; // gboolean is implemented as int
 
-            // payload
-            unsigned char *image_data;
+                ~FrameData(){if(_image_data) delete_data();} // prevent memeory leak
 
-            void release(){if (image_data) {delete [] image_data; image_data = nullptr;}};
+                
+                bool initialised(){return _initialised;};
+
+                // allocating buffer with size
+                void allocate(size_t size){
+                    assert(!_image_data && !_initialised);
+                    _image_data = new unsigned char[size];
+                }
+
+                // write data to an un-initialised by allocated buffer
+                void write_data(unsigned char * data, size_t size){
+                    assert(!_initialised);
+                    std::memcpy(_image_data, data, size);
+                    _initialised = true;
+                }
+
+                // de-initialise, but preserve the allocation
+                void release(){
+                    _initialised = false;
+                }
+
+                // remove allocation and de-initialise
+                void delete_data(){
+                    assert(_image_data);
+                    delete [] _image_data; 
+                    _image_data = nullptr;
+                    _initialised = false;
+                }
+                const unsigned char * image_data(){return _image_data;};
+
+            private:
+                bool _initialised = false;
+                // payload
+                unsigned char *_image_data = nullptr;
+
         };
 
-        typedef std::function<void(const FrameData&)> callbackCamera;
+        typedef std::function<void(std::shared_ptr<FrameData>)> callbackCamera;
 
         TisCameraManager(const std::string topic_ns, const std::string serial = "");
         ~TisCameraManager();
@@ -69,7 +105,7 @@ class TisCameraManager : public gsttcam::TcamCamera
         bool start(); // gst playing state
         bool stop();
         void processFrame(); // run in a separate thread
-        FrameData getNextFrame();
+        std::shared_ptr<FrameData> getNextFrame();
 
         void registerCallback(callbackCamera cb);
 
@@ -78,7 +114,7 @@ class TisCameraManager : public gsttcam::TcamCamera
     private:
         bool is_streaming;
         struct FrameDataMutexed{
-            FrameData data;
+            std::shared_ptr<FrameData> data;
 
             std::mutex mtx;
             std::condition_variable con;

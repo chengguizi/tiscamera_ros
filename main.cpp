@@ -168,10 +168,10 @@ cv::Mat do_tonemapping(cvl_frame_t* frame, void* srcptr_raw, float max_abs_lum)
 }
 #endif
 
-inline void publish_image(const TisCameraManager::FrameData& frame, size_t index, uint64_t trigger_time)
+inline void publish_image(std::shared_ptr<TisCameraManager::FrameData> frame, size_t index, uint64_t trigger_time)
 {
 
-    assert(frame.initialised);
+    assert(frame->initialised());
 
     //// following code from /cvl-mirror/cvtool/doc/cvl.html
     // static cvl_gl_context_t *gl_context = nullptr;
@@ -198,17 +198,18 @@ inline void publish_image(const TisCameraManager::FrameData& frame, size_t index
     // cv::Mat frame_ret_l = do_tonemapping(_tmpframe, left_frame.image_data, 65535);
     
     // auto left = frame_ret_l;
-    auto image_cv = cv::Mat(cv::Size(frame.width, frame.height), CV_16UC1, frame.image_data, cv::Mat::AUTO_STEP);
+    auto image_cv = cv::Mat(cv::Size(frame->width, frame->height), CV_16UC1, (void *)frame->image_data(), cv::Mat::AUTO_STEP);
 
     assert(_camera_pub[index] != nullptr);
 
     _camera_pub[index]->publish(image_cv, "mono16", CameraParam::list[index]->camera_info, ros::Time().fromNSec(trigger_time));
 }
 
-void callbackIndividual_handler(const TisCameraManager::FrameData& data, const size_t index)
+void callbackIndividual_handler(std::shared_ptr<TisCameraManager::FrameData> data, const size_t index)
 {
     // use capture time as the 'trigger time', as the camera is free running
-    publish_image(data, index, data.capture_time_ns);
+    publish_image(data, index, data->capture_time_ns);
+    data->release();
 }
 
 
@@ -219,6 +220,7 @@ void callbackSynced_handler(const CameraIMUSyncN::MetaFrame& frame)
         // skip cameras that are not in the sync group
         if (frame.cameraBitMask & 1<<i){
             publish_image(frame.camera[i], i, frame.trigger_time);
+            frame.camera[i]->release();
         }
             
     }

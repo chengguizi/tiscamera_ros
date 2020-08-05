@@ -27,10 +27,16 @@ class CameraIMUSync{
 
         struct MetaFrame{
             uint64_t trigger_time;
-            std::vector<TcameraData> camera;
+            std::vector<std::shared_ptr<TcameraData>> camera;
             unsigned char cameraBitMask;
 
-            void reset(){cameraBitMask = 0;};
+            void reset(){
+                cameraBitMask = 0;
+                for (auto& cam : camera){
+                    if(cam)
+                        cam->release(); // de-initialise the data buffer, so can be over-written
+                }
+            }
             bool isComplete(const unsigned char& CAMERA_MASK){return (cameraBitMask == CAMERA_MASK); };
         };
 
@@ -50,7 +56,7 @@ class CameraIMUSync{
         void set_imu_read_jitter(double sec){max_imu_read_jitter = sec * 1e9;}; // maximum delay of imu buffer being read by kernel
         void set_camera_mask(const unsigned char camera_mask){CAMERA_MASK = camera_mask;};
         void push_backIMU(uint64_t monotonic_time, uint64_t timeSyncIn);
-        void push_backCamera(const TcameraData& data, const uint index, bool master);
+        void push_backCamera(std::shared_ptr<TcameraData> data, const uint index, bool master);
         
         typedef std::function<void(const MetaFrame&)> callbackSynced;
         void register_callback_synced(callbackSynced cb){_cblist_synced.push_back(cb); };
@@ -61,7 +67,7 @@ class CameraIMUSync{
         unsigned int Ncamera;
         unsigned char CAMERA_MASK;
 
-        const static uint BUFFER_SIZE = 16;
+        const static uint BUFFER_SIZE = 8;
         unsigned char BUFFER_MASK = BUFFER_SIZE - 1;
         #define MASK(x) ((x) & BUFFER_MASK)
 
@@ -72,7 +78,7 @@ class CameraIMUSync{
 
         std::vector<MetaFrame> metaFrame;
 
-        std::forward_list<std::function<void(const TcameraData&, const uint)>> cam_callback_cache;
+        std::forward_list<std::function<void(std::shared_ptr<TcameraData>, const uint)>> cam_callback_cache;
 
         unsigned char begin = 0;
         unsigned char end = 0; // one plus the end index
@@ -104,6 +110,7 @@ void CameraIMUSync<TcameraData>::push_backIMU(uint64_t monotonic_time, uint64_t 
     std::cout << "IMU " <<  monotonic_time << ", index " << MASK(end - 1) << std::endl;
 
     if(MASK(begin) == MASK(end)){ // remove the oldest record when full
+        metaFrame[MASK(begin)].reset();
         begin++;
     }
 
@@ -118,15 +125,19 @@ void CameraIMUSync<TcameraData>::push_backIMU(uint64_t monotonic_time, uint64_t 
 }
 
 template <class TcameraData>
-void CameraIMUSync<TcameraData>::push_backCamera(const TcameraData& data, const uint index, bool master)
+void CameraIMUSync<TcameraData>::push_backCamera(std::shared_ptr<TcameraData> data, const uint index, bool master)
 {
-    // std::cout << "push_backCamera() " << index << std::endl;
+    std::cout << "push_backCamera() " << index << std::endl;
 
-    assert(data.initialised);
+    
+
+    assert(data->initialised());
 
     // if the camera is a master, add a fake imu measurement timing
     if(master)
-        push_backIMU(data.capture_time_ns, 0);
+        push_backIMU(data->capture_time_ns, 0);
+
+    std::lock_guard<std::mutex> lock(mtx);
 
     if (!camera_initialised){
         camera_initialised = true;
@@ -136,10 +147,10 @@ void CameraIMUSync<TcameraData>::push_backCamera(const TcameraData& data, const 
             begin = MASK(end - 1);
     }
 
-    if(!imu_initialised)
+    if(!imu_initialised){
+        data->release();
         return;
-
-    std::lock_guard<std::mutex> lock(mtx);
+    }
     
 
     assert(index < Ncamera); // must not be out of range
@@ -147,7 +158,7 @@ void CameraIMUSync<TcameraData>::push_backCamera(const TcameraData& data, const 
     //// if it is to override
     assert(MASK(begin) != MASK(end));
 
-    const uint64_t& camera_time = data.capture_time_ns;
+    const uint64_t& camera_time = data->capture_time_ns;
 
     // start searching from the oldest imu readings, find the first imu reading that is within the max slack
     for (unsigned char i = MASK(begin); i != MASK(end); i = MASK(i+1))
@@ -157,23 +168,20 @@ void CameraIMUSync<TcameraData>::push_backCamera(const TcameraData& data, const 
         // Use this to minus away the offset
         const uint64_t& imu_time = frame.trigger_time;
 
+        
+
+        // If camera is later than the imu time with maximum slack, skip
+        if (imu_time + max_slack < camera_time)
+                continue;
+        
+        // Reaching here, camera is within the slack time of the imu stamp
+
         // Conversion from unsigned to signed notation
         const double slack_sec = imu_time < camera_time ? 
             (camera_time - imu_time) / 1.0e9 : 
             - ((imu_time - camera_time) / 1.0e9) ;
 
-        // If camera is later than the imu time with maximum slack, skip
-        if (imu_time + max_slack < camera_time){
-
-            // // if it is the latest imu already, means the camera callback arrived before imu callback
-            // if (i == MASK(end - 1))
-            // else
-                continue;
-        }
-        
-        // Reaching here, camera is within the slack time of the imu stamp
-
-        // Now, checking if the camera is not too far ahead the current imu
+        // Now, checking if the camera is not too far ahead the current imu (jitter)
         if ( imu_time - max_imu_read_jitter < camera_time){ // allow IMU to be slightly slower than camera, due to jitter
             
             std::cout << "Slack (ms) = " << slack_sec * 1e3 << ", Adding frame " << index << "( time " << camera_time << ") to IMU " << int(i) << "(" << imu_time << ")" << std::endl;
@@ -182,9 +190,8 @@ void CameraIMUSync<TcameraData>::push_backCamera(const TcameraData& data, const 
 
             frame.cameraBitMask = frame.cameraBitMask | bit;
             // TODO: currently, this only works if the sync is completed, before the next batch of frames comes. But this is normally the case
+            // make initialised to false for all the rest of the data?
             frame.camera[index] = data;
-
-            assert(frame.camera[index].initialised);
 
             // detect if bitMask is full
             if (frame.isComplete(CAMERA_MASK))
@@ -200,26 +207,25 @@ void CameraIMUSync<TcameraData>::push_backCamera(const TcameraData& data, const 
                 syncedCallback(frame);
 
                 // reset all frames before this successful sync
-                while (begin != MASK(i+1)){
-                    metaFrame[begin].reset();
+                while (MASK(begin) != MASK(i+1)){
+                    metaFrame[MASK(begin)].reset();
                     begin = MASK(begin+1);
                 }
 
                 std::cout << "remaining data in buffer after success sync " << MASK(end - begin) << std::endl;
-
-                frame.reset();
             }
+            return;
         }else{
             std::cerr << "||||||||Failed to add camera frame: " << camera_time << std::endl;
             std::cerr << "Slack (ms) = " << slack_sec * 1e3 << std::endl; 
-        }
 
-        return;
+            data->release();
+            return;
+        }
+        
     }
 
     // Reaching here, means the camera callback reaches earlier than imu callback
-
-    // std::function<void(const TcameraData&, const uint)> func = [](const TcameraData& data, const uint index)
 
     std::cout << "Adding camera frame " << index << " to cache..." << std::endl;
     cam_callback_cache.push_front(std::bind(&CameraIMUSync::push_backCamera, this, data, index, false));

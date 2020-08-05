@@ -38,29 +38,31 @@ void ListProperties(TcamCamera &cam)
 bool take_next = false;
 TisCameraManager* cam = nullptr;
 
-void imageCallback(const TisCameraManager::FrameData& data){
+void imageCallback(std::shared_ptr<TisCameraManager::FrameData> data){
 
     // static int last_remainder = 0;
     static int total_count = 1;
     
 
     if (take_next){
-        std::cout << data.frame_count << "taken." << std::endl;
+        std::cout << data->frame_count << "taken." << std::endl;
 
         cv::Mat OpenCVImage;
-        OpenCVImage.create( data.height, data.width,CV_16UC1);
-        memcpy( OpenCVImage.data, data.image_data, data.bytes_per_pixel*data.height*data.width);
+        OpenCVImage.create( data->height, data->width,CV_16UC1);
+        memcpy( OpenCVImage.data, data->image_data(), data->bytes_per_pixel*data->height*data->width);
         std::ostringstream filename;
 
         // test for bit range
         // for
 
-        filename << total_count << "-" << data.frame_count << ".tiff";
+        filename << total_count << "-" << data->frame_count << ".tiff";
 
         cv::imwrite(filename.str() ,OpenCVImage);
         take_next = false;
         total_count++;
     }
+
+    data->release();
     
 }
 
