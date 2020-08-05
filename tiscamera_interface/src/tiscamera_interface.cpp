@@ -461,7 +461,7 @@ GstFlowReturn TisCameraManager::setFrame(GstAppSink *appsink, gpointer data)
 
         
 
-        std::cout << frame.data->topic_ns << " " << frame.data->capture_time_ns  << " frame " << frame.data->frame_count << std::endl;
+        // std::cout << frame.data->topic_ns << " " << frame.data->capture_time_ns  << " frame " << frame.data->frame_count << std::endl;
         
         if (_cblist_camera.size())
         {
