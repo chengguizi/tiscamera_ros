@@ -33,9 +33,11 @@ class CameraIMUSync{
             void reset(){
                 cameraBitMask = 0;
                 for (auto& cam : camera){
-                    if(cam)
+                    if(cam){
                         cam->release(); // de-initialise the data buffer, so can be over-written
+                        cam = nullptr; // remove from our metaframe database
                 }
+            }
             }
             bool isComplete(const unsigned char& CAMERA_MASK){return (cameraBitMask == CAMERA_MASK); };
         };
