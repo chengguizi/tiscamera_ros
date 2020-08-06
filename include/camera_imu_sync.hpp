@@ -54,6 +54,7 @@ class CameraIMUSync{
             // intialise masks
             CAMERA_MASK = std::pow(2, Ncamera) - 1;
         };
+        void set_mean_delay(double sec){mean_delay = sec * 1e9;}; // the expected delay between imu trigger and data arrival of image frames in buffer
         void set_max_slack(double sec){max_slack = sec * 1e9;}; // maximum tolerated delay of camera respect to IMU
         void set_imu_read_jitter(double sec){max_imu_read_jitter = sec * 1e9;}; // maximum delay of imu buffer being read by kernel
         void set_camera_mask(const unsigned char camera_mask){CAMERA_MASK = camera_mask;};
@@ -73,8 +74,9 @@ class CameraIMUSync{
         unsigned char BUFFER_MASK = BUFFER_SIZE - 1;
         #define MASK(x) ((x) & BUFFER_MASK)
 
-        uint64_t max_slack; // maximum duration an IMU will wait for a camera frame         
-        uint64_t max_imu_read_jitter;
+        uint64_t mean_delay;
+        uint64_t max_slack; // maximum duration an IMU will wait for a camera frame, beyond the mean delay
+        uint64_t max_imu_read_jitter; // ahead of the mean delay
         std::mutex mtx;
         
 
@@ -177,7 +179,7 @@ void CameraIMUSync<TcameraData>::push_backCamera(std::shared_ptr<TcameraData> da
     //// if it is to override
     assert(MASK(begin) != MASK(end));
 
-    const uint64_t& camera_time = info.capture_time_ns;
+    const uint64_t& camera_time = info.capture_time_ns - mean_delay;
 
     // start searching from the oldest imu readings, find the first imu reading that is within the max slack
     for (unsigned char i = MASK(begin); i != MASK(end); i = MASK(i+1))

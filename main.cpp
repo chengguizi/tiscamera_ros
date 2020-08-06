@@ -300,8 +300,18 @@ int main(int argc, char **argv)
 
     // sync struct
     int RATE;
+    double MEAN_DELAY, MAX_SLACK, MAX_IMU_READ_JITTER;
     std::string IMU_SOURCE;
-    nh_local.getParam("sync_rate", RATE);
+    ROS_ASSERT(nh_local.getParam("sync_rate", RATE));
+
+    if (!nh_local.getParam("mean_delay", MEAN_DELAY))
+        MEAN_DELAY = 0.0;
+    if(!nh_local.getParam("max_slack", MAX_SLACK))
+        MAX_SLACK = 1.0/RATE * 0.8; // maximum slack to be 80% of the duration
+    if(!nh_local.getParam("max_imu_read_jitter", MAX_IMU_READ_JITTER))
+        MAX_IMU_READ_JITTER = std::max(1.0/RATE * 0.1, 0.008); // 8ms jitter allowed;
+
+
     nh_local.getParam("imu_source", IMU_SOURCE);
     ROS_INFO_STREAM("IMU sync rate (slave mode) is " << RATE << "fps");
     ROS_INFO_STREAM("IMU source is from" << IMU_SOURCE);
@@ -332,8 +342,12 @@ int main(int argc, char **argv)
         _camera_pub.resize(N);
 
         cameraImuSync.reset(new CameraIMUSyncN(N));
-        cameraImuSync->set_max_slack(1.0/RATE * 0.8); // maximum slack to be 80% of the duration
-        cameraImuSync->set_imu_read_jitter(std::max(1.0/RATE * 0.1, 0.008)); // 8ms jitter allowed
+        cameraImuSync->set_mean_delay(MEAN_DELAY);
+        std::cout << "set mean delay as " << MEAN_DELAY << " sec" << std::endl;
+        cameraImuSync->set_max_slack(MAX_SLACK); 
+        std::cout << "set max slack as " << MAX_SLACK << " sec" << std::endl;
+        cameraImuSync->set_imu_read_jitter(MAX_IMU_READ_JITTER);
+        std::cout << "set max imu read jitter as " << MAX_IMU_READ_JITTER << " sec" << std::endl;
 
         
         for (size_t i = 0; i < CameraParam::list.size(); i++)
