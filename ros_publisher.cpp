@@ -12,7 +12,7 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <iostream>
 
-#define BUFFER_SIZE 20
+#define BUFFER_SIZE 2
 
 
 StereoCameraPublisher::StereoCameraPublisher()

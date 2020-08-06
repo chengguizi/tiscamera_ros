@@ -173,32 +173,9 @@ inline void publish_image(std::shared_ptr<TisCameraManager::FrameData> frame, si
 
     assert(frame->initialised());
 
-    //// following code from /cvl-mirror/cvtool/doc/cvl.html
-    // static cvl_gl_context_t *gl_context = nullptr;
-    // static cvl_frame_t* _tmpframe = nullptr;
-    
-    //// convert data to cv::Mat
+    auto info = frame->get_info();
 
-    // if (!_tmpframe)
-    // {
-    //     /* Create a GL context on display ":0" and activate it. */
-    //     gl_context = cvl_gl_context_new(":0");
-    //     if (!gl_context)
-    //     {
-    //         fprintf(stderr, "Cannot create GL context.\n");
-    //         abort();
-    //     }
-
-    //     cvl_init();
-
-    //     std::cout << "initialising cvl buffer" << frame.width << ", " << frame.height << std::endl;
-    //     _tmpframe = cvl_frame_new(left_frame.width, left_frame.height, 3, CVL_XYZ, CVL_FLOAT16, CVL_MEM); // OR CVL_FLOAT
-    // }
-
-    // cv::Mat frame_ret_l = do_tonemapping(_tmpframe, left_frame.image_data, 65535);
-    
-    // auto left = frame_ret_l;
-    auto image_cv = cv::Mat(cv::Size(frame->width, frame->height), CV_16UC1, (void *)frame->image_data(), cv::Mat::AUTO_STEP);
+    auto image_cv = cv::Mat(cv::Size(info.width, info.height), CV_16UC1, (void *)frame->image_data(), cv::Mat::AUTO_STEP);
 
     assert(_camera_pub[index] != nullptr);
 
@@ -208,7 +185,7 @@ inline void publish_image(std::shared_ptr<TisCameraManager::FrameData> frame, si
 void callbackIndividual_handler(std::shared_ptr<TisCameraManager::FrameData> data, const size_t index)
 {
     // use capture time as the 'trigger time', as the camera is free running
-    publish_image(data, index, data->capture_time_ns);
+    publish_image(data, index, data->get_info().capture_time_ns);
     data->release();
 }
 
@@ -240,7 +217,7 @@ void start_camera(std::unique_ptr<TisCameraManager>& camera, const CameraParam& 
     camera->set_capture_format("GRAY16_LE", gsttcam::FrameSize{param.width,param.height}, gsttcam::FrameRate{param.gst_max_frame_rate,1}); // {1440,1080}
     
     camera->set_imx_low_latency_mode(true);
-    
+
     if (param.exposure_mode == "manual")
     {
         std::cout << "Setting Exposure Mode Manual" << std::endl;

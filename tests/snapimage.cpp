@@ -23,6 +23,10 @@ As sample image processing an OpenCV cv::Mat is generated and saved as JPEG
 
 using namespace gsttcam;
 
+// debuging for OS processing latency
+struct timespec time_now;
+uint64_t monotonic_time;
+
 
 void ListProperties(TcamCamera &cam)
 {
@@ -42,20 +46,29 @@ void imageCallback(std::shared_ptr<TisCameraManager::FrameData> data){
 
     // static int last_remainder = 0;
     static int total_count = 1;
-    
+
+    const int error = clock_gettime(CLOCK_MONOTONIC, &time_now);
+    assert(error == 0);
+    monotonic_time = (time_now.tv_sec * 1e9) + (time_now.tv_nsec);
+
+    double delay_ms = (monotonic_time - data->get_info().capture_time_ns) / 1.0e6;
+
+    std::cout << "OS delay = " << delay_ms << " ms" << std::endl;
 
     if (take_next){
-        std::cout << data->frame_count << "taken." << std::endl;
+
+        auto datainfo = data->get_info();
+        std::cout << datainfo.frame_count << "taken." << std::endl;
 
         cv::Mat OpenCVImage;
-        OpenCVImage.create( data->height, data->width,CV_16UC1);
-        memcpy( OpenCVImage.data, data->image_data(), data->bytes_per_pixel*data->height*data->width);
+        OpenCVImage.create( datainfo.height,datainfo.width,CV_16UC1);
+        memcpy( OpenCVImage.data, data->image_data(), datainfo.bytes_per_pixel* datainfo.height * datainfo.width);
         std::ostringstream filename;
 
         // test for bit range
         // for
 
-        filename << total_count << "-" << data->frame_count << ".tiff";
+        filename << total_count << "-" << datainfo.frame_count << ".tiff";
 
         cv::imwrite(filename.str() ,OpenCVImage);
         take_next = false;
@@ -79,7 +92,7 @@ int main(int argc, char **argv)
     
 
     // Comment following line, if no live video display is wanted.
-    cam->enable_video_display(gst_element_factory_make("ximagesink", NULL));
+    cam->enable_video_display(gst_element_factory_make("xvimagesink", NULL)); // ximagesink
     
     // Set a color video format, resolution and frame rate
     cam->set_capture_format("GRAY16_LE", FrameSize{1440,1080}, FrameRate{30,1});

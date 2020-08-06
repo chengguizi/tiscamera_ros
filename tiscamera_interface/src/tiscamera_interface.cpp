@@ -18,11 +18,11 @@ using namespace gsttcam;
 
 TisCameraManager::TisCameraManager(const std::string topic_ns, const std::string serial) : TcamCamera(serial)
 {
-    frame.data.reset(new TisCameraManager::FrameData);
-    frame.data->camera_sn = serial;
-    frame.data->topic_ns = topic_ns;   
+    // initialise the frame pointer
+    frame = std::make_shared<FrameData>(topic_ns, serial);
+
     // frame.data->frame_count = 0;
-    assert(!frame.data->initialised());
+    assert(!frame->initialised());
 
     prop_trigger_mode = get_property("Trigger Mode");
     prop_trigger_polarity = get_property("Trigger Polarity");
@@ -320,7 +320,7 @@ void TisCameraManager::set_capture_format(std::string format, FrameSize size, Fr
 
 bool TisCameraManager::start()
 {
-    std::cout << frame.data->topic_ns <<": starting camera..." << std::endl;
+    std::cout << frame->get_info().topic_ns <<": starting camera..." << std::endl;
 
     set_new_frame_callback(std::bind(&TisCameraManager::setFrame, this, std::placeholders::_1, std::placeholders::_2), &frame);
 
@@ -329,7 +329,7 @@ bool TisCameraManager::start()
 
 bool TisCameraManager::stop()
 {
-    std::cout << frame.data->topic_ns <<": stopping camera..." << std::endl;
+    std::cout << frame->get_info().topic_ns <<": stopping camera..." << std::endl;
 
     return TcamCamera::stop();
 }
@@ -343,22 +343,23 @@ GstFlowReturn TisCameraManager::setFrame(GstAppSink *appsink, gpointer data)
     if (!_cblist_camera.size())
         return GST_FLOW_OK;
     
-    if(frame.mtx.try_lock())
+    if(frame->try_lock())
     {
         // check if the old data is still "in use"
         // if in use, create a totally new buffer in the heap
-        if (frame.data->initialised()){
-            std::cout << "TisCameraManager: Creating new data buffer, as the previous one still in use" << std::endl;
-            auto ptr = frame.data;
-            frame.data.reset(new FrameData);
+        
 
-            frame.data->topic_ns = ptr->topic_ns;
-            frame.data->camera_sn = ptr->camera_sn;
+        if (frame->initialised()){
+            std::cout << "TisCameraManager: Creating new data buffer, as the previous one still in use" << std::endl;
+            auto info = frame->get_info();
+            frame = std::make_shared<FrameData>(info.topic_ns, info.camera_sn);
         }
 
         // from here, we have ensure the data is not initialised, mean can be over-writted safely
 
-        const uint old_buffer_size = frame.data->width * frame.data->height * frame.data->bytes_per_pixel;
+        auto info = frame->get_info();
+
+        const uint old_buffer_size = info.width * info.height * info.bytes_per_pixel;
 
         // obtain buffer location
         GstSample *sample = gst_app_sink_pull_sample(appsink);
@@ -371,17 +372,17 @@ GstFlowReturn TisCameraManager::setFrame(GstAppSink *appsink, gpointer data)
         const GstCaps  *caps = gst_sample_get_caps(sample);
         const GstStructure * caps_structure = gst_caps_get_structure(caps, 0);
 
-        frame.data->pixel_format = gst_structure_get_string(caps_structure, "format");
+        info.pixel_format = gst_structure_get_string(caps_structure, "format");
 
-        if (frame.data->pixel_format == "GRAY16_LE")
-            frame.data->bytes_per_pixel = 2;
-        else if (frame.data->pixel_format == "GRAY_8")
-            frame.data->bytes_per_pixel = 1;
+        if (info.pixel_format == "GRAY16_LE")
+            info.bytes_per_pixel = 2;
+        else if (info.pixel_format == "GRAY_8")
+            info.bytes_per_pixel = 1;
         else
-            throw std::runtime_error("Unkown pixel format" + frame.data->pixel_format);
+            throw std::runtime_error("Unkown pixel format" + info.pixel_format);
 
-        gst_structure_get_int(caps_structure, "width", &frame.data->width);
-        gst_structure_get_int(caps_structure, "height", &frame.data->height);
+        gst_structure_get_int(caps_structure, "width", &info.width);
+        gst_structure_get_int(caps_structure, "height", &info.height);
 
         // std::cout  << "frame_width " << frame_width << ", frame_height " << frame_height << ", bytes_per_pixel " << bytes_per_pixel << std::endl;
 
@@ -396,7 +397,7 @@ GstFlowReturn TisCameraManager::setFrame(GstAppSink *appsink, gpointer data)
         if (meta)
         {
             // printf("We have meta\n");
-            frame.data->meta_api = meta->info->api;
+            info.meta_api = meta->info->api;
         }
         else
         {
@@ -429,65 +430,66 @@ GstFlowReturn TisCameraManager::setFrame(GstAppSink *appsink, gpointer data)
 
         // const GstMetaInfo * meta_info = gst_meta_get_info("TcamStatisticsMeta");
 
-        if (frame.data->meta_api > 0){
-            TcamStatisticsMeta *meta = (TcamStatisticsMeta *) gst_buffer_get_meta(buffer, frame.data->meta_api);
+        if (info.meta_api > 0){
+            TcamStatisticsMeta *meta = (TcamStatisticsMeta *) gst_buffer_get_meta(buffer, info.meta_api);
 
             assert(meta);
 
-            gst_structure_get_uint64(meta->structure, "frame_count", &frame.data->frame_count);
-            gst_structure_get_uint64(meta->structure, "frames_dropped", &frame.data->frames_dropped); 
+            gst_structure_get_uint64(meta->structure, "frame_count", &info.frame_count);
+            gst_structure_get_uint64(meta->structure, "frames_dropped", &info.frames_dropped); 
             // this is a monotonic clock, but not realtime
-            gst_structure_get_uint64(meta->structure, "capture_time_ns", &frame.data->capture_time_ns);
-            gst_structure_get_double(meta->structure, "framerate", &frame.data->framerate);
-            gst_structure_get_boolean(meta->structure, "is_damaged", &frame.data->is_damaged);
+            gst_structure_get_uint64(meta->structure, "capture_time_ns", &info.capture_time_ns);
+            gst_structure_get_double(meta->structure, "framerate", &info.framerate);
+            gst_structure_get_boolean(meta->structure, "is_damaged", &info.is_damaged);
         }
         
 
 
         //// Obtain buffer info
-        GstMapInfo info;
-        gst_buffer_map(buffer, &info, GST_MAP_READ); // read-only
+        GstMapInfo gstinfo;
+        gst_buffer_map(buffer, &gstinfo, GST_MAP_READ); // read-only
 
         // buffer should match caps
-        assert( (int)info.size == frame.data->width * frame.data->height * frame.data->bytes_per_pixel);
+        assert( (int)gstinfo.size == info.width * info.height * info.bytes_per_pixel);
 
-        assert(info.data);
+        assert(gstinfo.data);
 
-        if (frame.data->image_data() == nullptr)
-            frame.data->allocate(info.size);
-        else if (old_buffer_size!= info.size)
+        if (frame->image_data() == nullptr)
+            frame->allocate(gstinfo.size);
+        else if (old_buffer_size!= gstinfo.size)
         {
-            std::cout << "Detected change of buffer size from " << old_buffer_size << " to  " << info.size << std::endl;
-            frame.data->delete_data();
-            frame.data->allocate(info.size);
+            std::cout << "Detected change of buffer size from " << old_buffer_size << " to  " << gstinfo.size << std::endl;
+            frame->delete_data();
+            frame->allocate(gstinfo.size);
         }
 
         // we make a deep copy of the image from the GStreamer buffer to our local buffer
         // This buffer is reused everytime
-        frame.data->write_data(info.data, frame.data->width * frame.data->height * frame.data->bytes_per_pixel);
+        frame->write_data(gstinfo.data, info.width * info.height * info.bytes_per_pixel);
         
         // Calling Unref is important!
-        gst_buffer_unmap (buffer, &info);
+        gst_buffer_unmap (buffer, &gstinfo);
         gst_sample_unref(sample);
 
         
 
-        std::cout << frame.data->topic_ns << " " << frame.data->capture_time_ns  << " frame " << frame.data->frame_count << std::endl;
-        
+        std::cout << info.topic_ns << " " << info.capture_time_ns  << " frame " << info.frame_count << std::endl;
+
+        frame->set_info(info);
+        frame->unlock();
+        frame->con.notify_all();
+
+        // call callbacks outside the mutex
         if (_cblist_camera.size())
         {
             for (auto& cb : _cblist_camera)
-                cb(frame.data);
+                cb(frame);
         }
-
-        
-
-        frame.mtx.unlock();
-        frame.con.notify_all();
     }
     else
     {
-        std::cerr << frame.data->topic_ns << "Missed Frame " << frame.data->frame_count << std::endl;
+        auto info = frame->get_info();
+        std::cerr << info.topic_ns << "Missed Frame " << info.frame_count << std::endl;
     }
 
     return GST_FLOW_OK;
@@ -496,21 +498,22 @@ GstFlowReturn TisCameraManager::setFrame(GstAppSink *appsink, gpointer data)
 // should run on a separate thread
 void TisCameraManager::processFrame()
 {
-    std::cout << frame.data->topic_ns <<  ": process frame loop starts..." << std::endl;
+
+    std::cout << frame->get_info().topic_ns <<  ": process frame loop starts..." << std::endl;
     while (is_playing)
     {
-        std::unique_lock<std::mutex> lk(frame.mtx); // this call also locks the thread, with blocking behaviour
-        auto ret = frame.con.wait_for(lk,std::chrono::seconds(2)); // with ~0.03ms delay, lock reacquired
+        std::unique_lock<std::mutex> lk(frame->mtx); // this call also locks the thread, with blocking behaviour
+        auto ret = frame->con.wait_for(lk,std::chrono::seconds(2)); // with ~0.03ms delay, lock reacquired
 
         if (ret == std::cv_status::timeout ){
-            std::cerr << frame.data->topic_ns << ": Wait timeout for new frame arrival..." << std::endl;
+            std::cerr << frame->get_info().topic_ns << ": Wait timeout for new frame arrival..." << std::endl;
             continue;
         }
 
         // frame.data.image_data = nullptr; // make the next frame to take a new memory space
     }
 
-    std::cout << frame.data->topic_ns <<  ": process frame loop terminates..." << std::endl;
+    std::cout << frame->get_info().topic_ns <<  ": process frame loop terminates..." << std::endl;
 }
 
 void TisCameraManager::registerCallback(TisCameraManager::callbackCamera cb)
@@ -521,13 +524,13 @@ void TisCameraManager::registerCallback(TisCameraManager::callbackCamera cb)
 
 std::shared_ptr<TisCameraManager::FrameData> TisCameraManager::getNextFrame()
 {
-    std::unique_lock<std::mutex> lk(frame.mtx); // this call also locks the thread, with blocking behaviour
-    auto ret = frame.con.wait_for(lk,std::chrono::seconds(2)); // with ~0.03ms delay, lock reacquired
+    std::unique_lock<std::mutex> lk(frame->mtx); // this call also locks the thread, with blocking behaviour
+    auto ret = frame->con.wait_for(lk,std::chrono::seconds(2)); // with ~0.03ms delay, lock reacquired
 
     if (ret == std::cv_status::timeout ){
-        std::cerr << frame.data->topic_ns << ": Wait timeout for new frame arrival..." << std::endl;
+        std::cerr << frame->get_info().topic_ns << ": Wait timeout for new frame arrival..." << std::endl;
         return std::shared_ptr<TisCameraManager::FrameData>();
     }
 
-    return frame.data;
+    return frame;
 }

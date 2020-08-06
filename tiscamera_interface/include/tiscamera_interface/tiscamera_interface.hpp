@@ -26,26 +26,46 @@ class TisCameraManager : public gsttcam::TcamCamera
         class FrameData{
             public:
 
-                // Static info
-                std::string topic_ns;
-                std::string camera_sn;
-                int width;
-                int height;
-                int bytes_per_pixel;
-                std::string pixel_format;
+                struct Info{
+                    // Static info
+                    std::string topic_ns;
+                    std::string camera_sn;
+                    int width;
+                    int height;
+                    int bytes_per_pixel;
+                    std::string pixel_format;
 
-                // Gstreamer Metadata
-                unsigned long meta_api = 0;
-                uint64_t frame_count;
-                uint64_t frames_dropped;
-                uint64_t capture_time_ns;
-                double framerate;
-                int is_damaged; // gboolean is implemented as int
+                    // Gstreamer Metadata
+                    unsigned long meta_api = 0;
+                    uint64_t frame_count;
+                    uint64_t frames_dropped;
+                    uint64_t capture_time_ns;
+                    double framerate;
+                    int is_damaged; // gboolean is implemented as int
+                };
 
+                // FrameData() = default;
+                FrameData(std::string topic_ns, std::string camera_sn){
+                    _info.topic_ns = topic_ns;
+                    _info.camera_sn = camera_sn;
+                };
                 ~FrameData(){if(_image_data) delete_data();} // prevent memeory leak
+                FrameData (const FrameData&) = delete; // disable copy constructor
 
                 
-                bool initialised(){return _initialised;};
+                bool initialised(){return _initialised;}
+
+                void lock(){
+                    mtx.lock();
+                }
+
+                bool try_lock(){
+                    return mtx.try_lock();
+                }
+
+                void unlock(){
+                    mtx.unlock();
+                }
 
                 // allocating buffer with size
                 void allocate(size_t size){
@@ -62,6 +82,7 @@ class TisCameraManager : public gsttcam::TcamCamera
 
                 // de-initialise, but preserve the allocation
                 void release(){
+                    // std::cout << "releasing " << _info.capture_time_ns << std::endl;
                     _initialised = false;
                 }
 
@@ -72,12 +93,27 @@ class TisCameraManager : public gsttcam::TcamCamera
                     _image_data = nullptr;
                     _initialised = false;
                 }
-                const unsigned char * image_data(){return _image_data;};
+
+                const unsigned char * image_data(){
+                    return _image_data;
+                }
+
+                inline Info get_info(){
+                    return _info;
+                }
+
+                inline void set_info(const Info& info){
+                    _info = info;
+                }
+
+                std::condition_variable con;
+                std::mutex mtx;
 
             private:
                 bool _initialised = false;
                 // payload
                 unsigned char *_image_data = nullptr;
+                Info _info; 
 
         };
 
@@ -88,6 +124,7 @@ class TisCameraManager : public gsttcam::TcamCamera
 
         bool set_trigger_mode(TriggerMode value);
         TriggerMode get_trigger_mode();
+        bool set_imx_low_latency_mode(bool value);
         bool set_exposure_gain_auto(bool value);
         bool set_exposure_time(int value);
         bool set_exposure_limits(bool auto_upper, int lower, int upper);
@@ -95,7 +132,6 @@ class TisCameraManager : public gsttcam::TcamCamera
         bool set_gain(int value);
         bool set_gain_limits(int lower, int upper);
         bool set_gamma(float value);
-        // bool set_low_latency_mode(bool value);
         bool set_tonemapping_mode(bool value);
         bool set_tonemapping_param(float intensity, float global_brightness); // range: -8 to 8, default 1; range: 0 to 1, default 0
         
@@ -113,12 +149,8 @@ class TisCameraManager : public gsttcam::TcamCamera
     
     private:
         bool is_streaming;
-        struct FrameDataMutexed{
-            std::shared_ptr<FrameData> data;
 
-            std::mutex mtx;
-            std::condition_variable con;
-        }frame;
+        std::shared_ptr<FrameData> frame;
 
         // below are the mutex protected functions
         GstFlowReturn setFrame(GstAppSink *appsink, gpointer data); // callback from the Gstreamer backend
