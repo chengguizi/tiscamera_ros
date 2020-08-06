@@ -239,6 +239,8 @@ void start_camera(std::unique_ptr<TisCameraManager>& camera, const CameraParam& 
     // camera->set_capture_format("GRAY16_LE", gsttcam::FrameSize{1440,1080}, gsttcam::FrameRate{30,1});
     camera->set_capture_format("GRAY16_LE", gsttcam::FrameSize{param.width,param.height}, gsttcam::FrameRate{param.gst_max_frame_rate,1}); // {1440,1080}
     
+    camera->set_imx_low_latency_mode(true);
+    
     if (param.exposure_mode == "manual")
     {
         std::cout << "Setting Exposure Mode Manual" << std::endl;

@@ -127,6 +127,7 @@ class TisCameraManager : public gsttcam::TcamCamera
         std::shared_ptr<gsttcam::Property> prop_trigger_mode;
         std::shared_ptr<gsttcam::Property> prop_trigger_polarity;
         std::shared_ptr<gsttcam::Property> prop_trigger_exposure_mode;
+        std::shared_ptr<gsttcam::Property> prop_imx_low_latency_mode;
 
         std::shared_ptr<gsttcam::Property> prop_exposure_mode;
         std::shared_ptr<gsttcam::Property> prop_gain_mode;

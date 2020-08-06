@@ -27,6 +27,7 @@ TisCameraManager::TisCameraManager(const std::string topic_ns, const std::string
     prop_trigger_mode = get_property("Trigger Mode");
     prop_trigger_polarity = get_property("Trigger Polarity");
     prop_trigger_exposure_mode = get_property("Trigger Exposure Mode");
+    prop_imx_low_latency_mode = get_property("IMX Low-Latency Mode");
 
     prop_exposure_mode = get_property("Exposure Auto");
     prop_exposure_time = get_property("Exposure Time (us)");
@@ -134,6 +135,16 @@ TisCameraManager::TriggerMode TisCameraManager::get_trigger_mode()
     else
         return TriggerMode::TRIGGER_FALLING_EDGE;
 
+}
+
+bool TisCameraManager::set_imx_low_latency_mode(bool value)
+{
+    std::cout << "setting imx low latency mode to " << value << std::endl;
+    if (!prop_imx_low_latency_mode->set((*this), value))
+    {
+        throw std::runtime_error("set imx low latency mode FAILED");
+    }
+    return true;
 }
 
 bool TisCameraManager::set_exposure_gain_auto(bool value)
