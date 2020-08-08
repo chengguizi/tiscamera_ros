@@ -113,7 +113,7 @@ void CameraIMUSync<TcameraData>::push_backIMU(uint64_t monotonic_time, uint64_t 
     std::cout << "IMU syncIn Time " <<  timeSyncIn << ", index " << MASK(end - 1) << std::endl;
     std::cout << "IMU " <<  monotonic_time << ", index " << MASK(end - 1) << std::endl;
 
-    if(MASK(begin) == MASK(end)){ // remove the oldest record when full
+    if(MASK(begin) == MASK(end+1)){ // remove the oldest record when full
         metaFrame[MASK(begin)].reset();
         begin++;
     }
@@ -164,8 +164,8 @@ void CameraIMUSync<TcameraData>::push_backCamera(std::shared_ptr<TcameraData> da
         camera_initialised = true;
 
         // only keep the latest imu
-        if (imu_initialised)
-            begin = MASK(end - 1);
+        // if (imu_initialised)
+        //     begin = MASK(end - 1);
     }
 
     if(!imu_initialised){
@@ -177,7 +177,8 @@ void CameraIMUSync<TcameraData>::push_backCamera(std::shared_ptr<TcameraData> da
     assert(index < Ncamera); // must not be out of range
 
     //// if it is to override
-    assert(MASK(begin) != MASK(end));
+    // std::cout  << "index " << index << "begin = " << MASK(begin) << "end = " << MASK(end) << std::endl;
+    assert(MASK(begin) != MASK(end+1));
 
     const uint64_t& camera_time = info.capture_time_ns - mean_delay;
 
