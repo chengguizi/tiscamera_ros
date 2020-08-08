@@ -207,7 +207,14 @@ void CameraIMUSync<TcameraData>::push_backCamera(std::shared_ptr<TcameraData> da
             
             std::cout << "Slack (ms) = " << slack_sec * 1e3 << ", Adding frame " << index << "( time " << camera_time << ") to IMU " << int(i) << "(" << imu_time << ")" << std::endl;
             const unsigned char bit = 1 << index;
-            assert( (frame.cameraBitMask & bit) == 0);
+
+            // Check if there is another frame already registered. If yes, then we encountered ambiguity in the sync, throw away the whole meta frame
+            if((frame.cameraBitMask & bit) != 0){
+                std::cout << "Detected ambiguity for camera " << index << "with capture time " << frame.camera[index]->get_info().capture_time_ns << std::endl;
+                frame.cameraBitMask = frame.cameraBitMask & ~bit; // remove that active bit
+                frame.reset();
+                return;
+            }
 
             frame.cameraBitMask = frame.cameraBitMask | bit;
             // TODO: currently, this only works if the sync is completed, before the next batch of frames comes. But this is normally the case
