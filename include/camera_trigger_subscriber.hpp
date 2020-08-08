@@ -45,8 +45,7 @@ void CamIMUStampSubscriber::callback(const mavros_msgs::CamIMUStamp::ConstPtr ms
 
     uint64_t monotonic_time = msg->frame_stamp.toNSec();
     uint64_t timeSyncIn = 0;
-    int seq = msg->frame_seq_id;
-
+    // int seq = msg->frame_seq_id;
     // std::cout << "CamIMUStampSubscriber: " << seq << ", time " << monotonic_time << std::endl;
 
     if (_cb_sync_out_imu.size()){
