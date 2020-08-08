@@ -240,7 +240,7 @@ void start_camera(std::unique_ptr<TisCameraManager>& camera, const CameraParam& 
     {
         camera->set_trigger_mode(TisCameraManager::NONE); // prior to start, the camera has to be non-triggering mode
         camera->start();
-    }else if (param.hardware_sync_mode == "slave"){
+    }else if (param.hardware_sync_mode == "slave" || param.hardware_sync_mode == "fake_master"){
         
         camera->set_trigger_mode(TisCameraManager::NONE); // prior to start, the camera has to be non-triggering mode
         camera->start();
@@ -302,7 +302,7 @@ int main(int argc, char **argv)
     int RATE;
     double MEAN_DELAY, MAX_SLACK, MAX_IMU_READ_JITTER;
     std::string IMU_SOURCE;
-    ROS_ASSERT(nh_local.getParam("sync_rate", RATE));
+    nh_local.param("sync_rate",RATE,10);
 
     if (!nh_local.getParam("mean_delay", MEAN_DELAY))
         MEAN_DELAY = 0.0;
@@ -422,7 +422,7 @@ int main(int argc, char **argv)
                     has_slave = true;
                     camera->registerCallback(std::bind(&CameraIMUSyncN::push_backCamera, cameraImuSync, std::placeholders::_1, i, false));
                 }
-                else if (param->hardware_sync_mode == "master")
+                else if (param->hardware_sync_mode == "master" || param->hardware_sync_mode == "fake_master")
                 {
                     has_master = true;
                     // there should be only 1 master at most, the master will act as a fake IMU
