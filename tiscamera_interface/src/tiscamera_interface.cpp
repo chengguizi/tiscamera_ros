@@ -350,8 +350,8 @@ GstFlowReturn TisCameraManager::setFrame(GstAppSink *appsink, gpointer data)
         
 
         if (frame->initialised()){
-            std::cout << "TisCameraManager: Creating new data buffer, as the previous one still in use" << std::endl;
             auto info = frame->get_info();
+            std::cout << "TisCameraManager: Creating new data buffer for camera " << info.topic_ns <<", as the previous one still in use" << std::endl;
             frame = std::make_shared<FrameData>(info.topic_ns, info.camera_sn);
         }
 

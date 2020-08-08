@@ -82,7 +82,7 @@ class CameraIMUSync{
 
         std::vector<MetaFrame> metaFrame;
 
-        std::forward_list<std::function<void(std::shared_ptr<TcameraData>, const uint)>> cam_callback_cache;
+        std::forward_list<std::function<void(void)>> cam_callback_cache;
 
         unsigned char begin = 0;
         unsigned char end = 0; // one plus the end index
@@ -110,7 +110,7 @@ void CameraIMUSync<TcameraData>::push_backIMU(uint64_t monotonic_time, uint64_t 
     frame.trigger_time = monotonic_time - timeSyncIn;
     end++;
 
-    std::cout << "IMU syncIn Time " <<  timeSyncIn << ", index " << MASK(end - 1) << std::endl;
+    // std::cout << "IMU syncIn Time " <<  timeSyncIn << ", index " << MASK(end - 1) << std::endl;
     std::cout << "IMU " <<  monotonic_time << ", index " << MASK(end - 1) << std::endl;
 
     if(MASK(begin) == MASK(end+1)){ // remove the oldest record when full
@@ -123,7 +123,7 @@ void CameraIMUSync<TcameraData>::push_backIMU(uint64_t monotonic_time, uint64_t 
     // Execute cached camera callbacks
     while (!cam_callback_cache.empty()){
         std::cout << "Execute Camera Callback Cache" << std::endl;
-        cam_callback_cache.front();
+        cam_callback_cache.front()();
         cam_callback_cache.pop_front();
     }
 }
@@ -133,6 +133,8 @@ void CameraIMUSync<TcameraData>::push_backCamera(std::shared_ptr<TcameraData> da
 {
 
     std::lock_guard<std::mutex> lock_data(data->mtx);
+
+    mtx.lock();
 
     assert(data->initialised());
 
@@ -151,8 +153,7 @@ void CameraIMUSync<TcameraData>::push_backCamera(std::shared_ptr<TcameraData> da
         std::cout << "push_backCamera(), index = " << index << ", OS delay " <<  delay_ms << "ms" << std::endl;
     }
 
-    
-
+    mtx.unlock();
 
     // if the camera is a master, add a fake imu measurement timing
     if(master)
@@ -257,6 +258,7 @@ void CameraIMUSync<TcameraData>::push_backCamera(std::shared_ptr<TcameraData> da
     // Reaching here, means the camera callback reaches earlier than imu callback
 
     std::cout << "Adding camera frame " << index << " to cache..." << std::endl;
+    assert(!master);
     cam_callback_cache.push_front(std::bind(&CameraIMUSync::push_backCamera, this, data, index, false));
 }
 
