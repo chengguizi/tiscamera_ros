@@ -8,7 +8,7 @@
 #define CAMERA_IMU_SYNC_HPP
 
 #include <cmath>
-#include <forward_list>
+#include <list>
 
 #include <mutex>
 
@@ -82,7 +82,7 @@ class CameraIMUSync{
 
         std::vector<MetaFrame> metaFrame;
 
-        std::forward_list<std::function<void(void)>> cam_callback_cache;
+        std::list< std::pair<std::shared_ptr<TcameraData>, uint> > cam_callback_cache;
 
         unsigned char begin = 0;
         unsigned char end = 0; // one plus the end index
@@ -123,7 +123,8 @@ void CameraIMUSync<TcameraData>::push_backIMU(uint64_t monotonic_time, uint64_t 
     // Execute cached camera callbacks
     while (!cam_callback_cache.empty()){
         std::cout << "Execute Camera Callback Cache" << std::endl;
-        cam_callback_cache.front()();
+        auto& param = cam_callback_cache.front();
+        push_backCamera(param.first, param.second, false);
         cam_callback_cache.pop_front();
     }
 }
@@ -259,7 +260,16 @@ void CameraIMUSync<TcameraData>::push_backCamera(std::shared_ptr<TcameraData> da
 
     std::cout << "Adding camera frame " << index << " to cache..." << std::endl;
     assert(!master);
-    cam_callback_cache.push_front(std::bind(&CameraIMUSync::push_backCamera, this, data, index, false));
+    cam_callback_cache.emplace_front(data, index);
+
+    if (cam_callback_cache.size() > BUFFER_SIZE){
+        std::cout << "camera " << index << " callback cache full, throwing one" << std::endl;
+
+        // releasing the memory of the shared_ptr
+        cam_callback_cache.front().first->release();
+        cam_callback_cache.pop_front();
+    }
+
 }
 
 template <class TcameraData>
