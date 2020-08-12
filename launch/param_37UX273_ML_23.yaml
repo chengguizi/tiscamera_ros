@@ -10,11 +10,11 @@ format: GRAY16_LE
 # indoor conditions
 initial_exposure: 3000 # us
 initial_gain: 0 # range from 0 to 480
-initial_gamma: 0.9 # default is 1
+initial_gamma: 0.85 # default is 1
 
-exposure_auto_reference: 100
+exposure_auto_reference: 55
 
-auto_upper_limit_exposure: false
+auto_upper_limit_exposure: true
 
 lower_limit_exposure: 333 # us
 lower_limit_gain: 0
