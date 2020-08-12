@@ -464,6 +464,8 @@ int main(int argc, char **argv)
 
         ros::spin();
 
+        std::cout << std::endl << "====================" << "ROS shutting down..." << "===================="  << std::endl;
+
         for (auto& camera : tiscamera_list)
             camera->stop();
 

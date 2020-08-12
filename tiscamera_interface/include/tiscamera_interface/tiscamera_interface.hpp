@@ -53,7 +53,9 @@ class TisCameraManager : public gsttcam::TcamCamera
                 FrameData (const FrameData&) = delete; // disable copy constructor
 
                 
-                bool initialised(){return _initialised;}
+                bool initialised(){
+                    std::lock_guard<std::recursive_mutex> lock(mtx);
+                    return _initialised;}
 
                 void lock(){
                     mtx.lock();
@@ -69,12 +71,14 @@ class TisCameraManager : public gsttcam::TcamCamera
 
                 // allocating buffer with size
                 void allocate(size_t size){
+                    std::lock_guard<std::recursive_mutex> lock(mtx);
                     assert(!_image_data && !_initialised);
                     _image_data = new unsigned char[size];
                 }
 
                 // write data to an un-initialised by allocated buffer
                 void write_data(unsigned char * data, size_t size){
+                    std::lock_guard<std::recursive_mutex> lock(mtx);
                     assert(!_initialised);
                     std::memcpy(_image_data, data, size);
                     _initialised = true;
@@ -82,12 +86,14 @@ class TisCameraManager : public gsttcam::TcamCamera
 
                 // de-initialise, but preserve the allocation
                 void release(){
+                    std::lock_guard<std::recursive_mutex> lock(mtx);
                     // std::cout << "releasing " << _info.capture_time_ns << std::endl;
                     _initialised = false;
                 }
 
                 // remove allocation and de-initialise
                 void delete_data(){
+                    std::lock_guard<std::recursive_mutex> lock(mtx);
                     assert(_image_data);
                     delete [] _image_data; 
                     _image_data = nullptr;
@@ -95,19 +101,22 @@ class TisCameraManager : public gsttcam::TcamCamera
                 }
 
                 const unsigned char * image_data(){
+                    std::lock_guard<std::recursive_mutex> lock(mtx);
                     return _image_data;
                 }
 
                 inline Info get_info(){
+                    std::lock_guard<std::recursive_mutex> lock(mtx);
                     return _info;
                 }
 
                 inline void set_info(const Info& info){
+                    std::lock_guard<std::recursive_mutex> lock(mtx);
                     _info = info;
                 }
 
-                std::condition_variable con;
-                std::mutex mtx;
+                std::condition_variable_any con;
+                std::recursive_mutex mtx; // prevent data race between different processes
 
             private:
                 bool _initialised = false;

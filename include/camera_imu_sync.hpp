@@ -34,6 +34,7 @@ class CameraIMUSync{
                 cameraBitMask = 0;
                 for (auto& cam : camera){
                     if(cam){
+                        std::lock_guard<std::recursive_mutex> lock(cam->mtx);
                         cam->release(); // de-initialise the data buffer, so can be over-written
                         cam = nullptr; // remove from our metaframe database
                     }
@@ -77,7 +78,7 @@ class CameraIMUSync{
         uint64_t mean_delay;
         uint64_t max_slack; // maximum duration an IMU will wait for a camera frame, beyond the mean delay
         uint64_t max_imu_read_jitter; // ahead of the mean delay
-        std::mutex mtx;
+        std::recursive_mutex mtx;
         
 
         std::vector<MetaFrame> metaFrame;
@@ -96,12 +97,12 @@ class CameraIMUSync{
 template <class TcameraData>
 void CameraIMUSync<TcameraData>::push_backIMU(uint64_t monotonic_time, uint64_t timeSyncIn)
 {
-    // std::lock_guard<std::mutex> lock(mtx);
-
-    mtx.lock();
+    std::lock_guard<std::recursive_mutex> lock(mtx);
 
     if (!imu_initialised)
         imu_initialised = true;
+
+    assert(MASK(begin) != MASK(end+1));
 
     // push back the data
     MetaFrame& frame = metaFrame[MASK(end)];
@@ -118,26 +119,25 @@ void CameraIMUSync<TcameraData>::push_backIMU(uint64_t monotonic_time, uint64_t 
         begin++;
     }
 
-    mtx.unlock();
-
     // Execute cached camera callbacks
-    while (!cam_callback_cache.empty()){
-        std::cout << "Execute Camera Callback Cache" << std::endl;
-        auto& param = cam_callback_cache.front();
-        push_backCamera(param.first, param.second, false);
+    // the pop_size prevent circular calling
+    auto pop_size = cam_callback_cache.size();
+    while (pop_size--){
+        auto param = cam_callback_cache.front();
         cam_callback_cache.pop_front();
+        push_backCamera(param.first, param.second, false);
     }
 }
 
 template <class TcameraData>
 void CameraIMUSync<TcameraData>::push_backCamera(std::shared_ptr<TcameraData> data, const uint index, bool master)
 {
+    std::scoped_lock lock(mtx, data->mtx);
 
-    std::lock_guard<std::mutex> lock_data(data->mtx);
-
-    mtx.lock();
-
-    assert(data->initialised());
+    // the data might be uninitialised, if it is stored in the cam_callback_cache for a while
+    if(!data->initialised()){
+        return;
+    }
 
     auto info = data->get_info();
 
@@ -154,13 +154,9 @@ void CameraIMUSync<TcameraData>::push_backCamera(std::shared_ptr<TcameraData> da
         std::cout << "push_backCamera(), index = " << index << ", OS delay " <<  delay_ms << "ms" << std::endl;
     }
 
-    mtx.unlock();
-
     // if the camera is a master, add a fake imu measurement timing
     if(master)
         push_backIMU(info.capture_time_ns, 0);
-
-    std::lock_guard<std::mutex> lock(mtx);
 
     if (!camera_initialised){
         camera_initialised = true;
@@ -227,13 +223,10 @@ void CameraIMUSync<TcameraData>::push_backCamera(std::shared_ptr<TcameraData> da
             // detect if bitMask is full
             if (frame.isComplete(CAMERA_MASK))
             {
-                std::cout << "IMU sync complete! for index " << MASK(i) << std::endl << std::endl;
 
                 if( i != MASK(begin)){
                     std::cerr << "[[[[[WARNING: Skipping " << MASK(i-begin) << " IMU data]]]]]" << std::endl;
-                }
-
-                
+                }       
 
                 syncedCallback(frame);
 
@@ -243,7 +236,9 @@ void CameraIMUSync<TcameraData>::push_backCamera(std::shared_ptr<TcameraData> da
                     begin = MASK(begin+1);
                 }
 
-                std::cout << "remaining data in buffer after success sync " << MASK(end - begin) << std::endl;
+                std::cout << "IMU sync complete! for index " << MASK(i) << std::endl 
+                    << "remaining data in buffer after success sync " << MASK(end - begin) << std::endl
+                    << std::endl;
             }
             return;
         }else{
@@ -258,12 +253,12 @@ void CameraIMUSync<TcameraData>::push_backCamera(std::shared_ptr<TcameraData> da
 
     // Reaching here, means the camera callback reaches earlier than imu callback
 
-    std::cout << "Adding camera frame " << index << " to cache..." << std::endl;
+    std::cout << "Adding camera "<< index << " frame " << info.frame_count << " to cache..." << std::endl;
     assert(!master);
-    cam_callback_cache.emplace_front(data, index);
+    cam_callback_cache.emplace_back(data, index);
 
-    if (cam_callback_cache.size() > BUFFER_SIZE){
-        std::cout << "camera " << index << " callback cache full, throwing one" << std::endl;
+    if (cam_callback_cache.size() > BUFFER_SIZE * Ncamera){
+        std::cout << "camera " << index << " callback cache full, throwing frame " << cam_callback_cache.front().first->get_info().frame_count << std::endl;
 
         // releasing the memory of the shared_ptr
         cam_callback_cache.front().first->release();

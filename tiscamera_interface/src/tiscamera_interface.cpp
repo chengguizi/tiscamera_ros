@@ -352,6 +352,7 @@ GstFlowReturn TisCameraManager::setFrame(GstAppSink *appsink, gpointer data)
         if (frame->initialised()){
             auto info = frame->get_info();
             std::cout << "TisCameraManager: Creating new data buffer for camera " << info.topic_ns <<", as the previous one still in use" << std::endl;
+            frame->unlock(); // unlock it, as we are not using it below this
             frame = std::make_shared<FrameData>(info.topic_ns, info.camera_sn);
         }
 
@@ -502,7 +503,7 @@ void TisCameraManager::processFrame()
     std::cout << frame->get_info().topic_ns <<  ": process frame loop starts..." << std::endl;
     while (is_playing)
     {
-        std::unique_lock<std::mutex> lk(frame->mtx); // this call also locks the thread, with blocking behaviour
+        std::unique_lock<std::recursive_mutex> lk(frame->mtx); // this call also locks the thread, with blocking behaviour
         auto ret = frame->con.wait_for(lk,std::chrono::seconds(2)); // with ~0.03ms delay, lock reacquired
 
         if (ret == std::cv_status::timeout ){
@@ -524,7 +525,7 @@ void TisCameraManager::registerCallback(TisCameraManager::callbackCamera cb)
 
 std::shared_ptr<TisCameraManager::FrameData> TisCameraManager::getNextFrame()
 {
-    std::unique_lock<std::mutex> lk(frame->mtx); // this call also locks the thread, with blocking behaviour
+    std::unique_lock<std::recursive_mutex> lk(frame->mtx); // this call also locks the thread, with blocking behaviour
     auto ret = frame->con.wait_for(lk,std::chrono::seconds(2)); // with ~0.03ms delay, lock reacquired
 
     if (ret == std::cv_status::timeout ){
