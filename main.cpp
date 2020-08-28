@@ -16,7 +16,6 @@
 #include <mutex>
 
 #include <ros/ros.h>
-#include <imu_vn_100/imu_vn_100.h>
 
 #include <sensor_msgs/image_encodings.h>
 
@@ -324,7 +323,7 @@ int main(int argc, char **argv)
     bool has_slave = false;
 
     std::shared_ptr<CameraIMUSyncN> cameraImuSync;
-    std::shared_ptr<imu_vn_100::ImuVn100> imu_vn100;
+    // std::shared_ptr<imu_vn_100::ImuVn100> imu_vn100;
     std::shared_ptr<CamIMUStampSubscriber> imu_mavros;
 
     std::cout << "Discovering Cameras..." << std::endl;
@@ -446,9 +445,11 @@ int main(int argc, char **argv)
             std::cout << "launching external IMU unit " << IMU_SOURCE << std::endl;
 
             if(IMU_SOURCE == "vn-100"){
-                imu_vn100.reset(new imu_vn_100::ImuVn100(nh_local));
-                imu_vn100->Stream(true);
-                imu_vn100->registerCallback(std::bind(&CameraIMUSyncN::push_backIMU, cameraImuSync, std::placeholders::_1, std::placeholders::_2));
+                std::cout << "vn-100 is no longer supported" << std::endl;
+                std::abort();
+                // imu_vn100.reset(new imu_vn_100::ImuVn100(nh_local));
+                // imu_vn100->Stream(true);
+                // imu_vn100->registerCallback(std::bind(&CameraIMUSyncN::push_backIMU, cameraImuSync, std::placeholders::_1, std::placeholders::_2));
             }
             else if(IMU_SOURCE == "mavros"){
                 imu_mavros.reset(new CamIMUStampSubscriber(nh,"/mavros/cam_imu_sync/cam_imu_stamp"));

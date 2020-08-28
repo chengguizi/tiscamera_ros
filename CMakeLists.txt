@@ -42,7 +42,6 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   image_transport
   cv_bridge
-  imu_vn_100
   mavros
 )
 
@@ -50,7 +49,7 @@ find_package(catkin REQUIRED COMPONENTS
 catkin_package(
   # INCLUDE_DIRS 
   # LIBRARIES 
-  CATKIN_DEPENDS imu_vn_100
+  # CATKIN_DEPENDS imu_vn_100
   # DEPENDS
 )
 
