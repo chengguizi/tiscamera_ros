@@ -15,12 +15,23 @@
 #include <functional>
 #include <vector>
 
+#include <time.h>
+
 /**
  * Every IMU data coming in, will trigger a collection machanism, to collect incoming camera frames. 
  * The time stamps are strictly more recent, and no larger than the maximum duration
  * 
  * For simplicity and efficiency, here we assume IMU data always come in before all camera frames, in realtime
  */ 
+
+uint64_t get_monotonic_now(void)
+{
+	struct timespec spec;
+	clock_gettime(CLOCK_MONOTONIC, &spec);
+
+	return spec.tv_sec * 1000000000ULL + spec.tv_nsec;
+}
+
 template <class TcameraData>
 class CameraIMUSync{
     public:
@@ -236,7 +247,11 @@ void CameraIMUSync<TcameraData>::push_backCamera(std::shared_ptr<TcameraData> da
                     begin = MASK(begin+1);
                 }
 
-                std::cout << "IMU sync complete! for index " << MASK(i) << std::endl 
+                // generate latency statistics
+                uint latency = (get_monotonic_now() - frame.trigger_time) / 1e6;
+                
+
+                std::cout << "IMU sync complete! for index " << MASK(i) << ", with latency " << latency << "ms" << std::endl 
                     << "remaining data in buffer after success sync " << MASK(end - begin) << std::endl
                     << std::endl;
             }
