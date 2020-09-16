@@ -295,7 +295,7 @@ TcamCamera::create_pipeline()
     tee_ = gst_element_factory_make("tee", "tee");
     GstElement *queue = gst_element_factory_make("queue", nullptr);
     capturesink_ = gst_element_factory_make("appsink", nullptr);
-    g_object_set(capturesink_, "max-buffers", 2, "drop", true, nullptr);
+    g_object_set(capturesink_, "max-buffers", 1, "drop", true, nullptr);
     assert(pipeline_ && tee_ && capturecapsfilter_ && queue && capturesink_);
 
 
