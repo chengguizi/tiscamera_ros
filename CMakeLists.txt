@@ -36,7 +36,7 @@ add_subdirectory(tests)
 
 find_package(Threads REQUIRED)
 
-find_package(OpenCV 3 REQUIRED)
+find_package(OpenCV 4 REQUIRED)
 
 find_package(catkin REQUIRED COMPONENTS
   roscpp

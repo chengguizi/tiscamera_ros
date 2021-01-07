@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.5)
 project(tiscamera_test)
 
-find_package(OpenCV 3 REQUIRED)
+find_package(OpenCV 4 REQUIRED)
 
 add_executable(snapimage snapimage.cpp)
 target_include_directories(snapimage PRIVATE ${OpenCV_INCLUDE_DIRS})
