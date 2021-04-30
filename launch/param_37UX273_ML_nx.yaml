@@ -1,0 +1,27 @@
+# Configurations for The Imaging Source Board Camera
+# Tiscamera on Linux
+# DMM 37UX273-ML
+
+width: 1440
+height: 1080
+gst_max_frame_rate: 30 # should be heigher than actual sync_rate
+format: BGR # GRAY16_LE / BGR
+
+# indoor conditions
+initial_exposure: 3000 # us
+initial_gain: 0 # range from 0 to 480
+initial_gamma: 0.85 # default is 1
+
+exposure_auto_reference: 55
+
+auto_upper_limit_exposure: true
+
+lower_limit_exposure: 5 # us
+lower_limit_gain: 0
+
+upper_limit_exposure: 10000 # us
+upper_limit_gain: 200 # range from 0 to 480
+
+# low light conditions
+# initial_exposure: 10000 # us
+# initial_gain: 200 # range from 0 to 480

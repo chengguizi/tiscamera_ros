@@ -379,8 +379,10 @@ GstFlowReturn TisCameraManager::setFrame(GstAppSink *appsink, gpointer data)
             info.bytes_per_pixel = 2;
         else if (info.pixel_format == "GRAY_8")
             info.bytes_per_pixel = 1;
+        else if (info.pixel_format == "BGR")
+            info.bytes_per_pixel = 3;
         else
-            throw std::runtime_error("Unkown pixel format" + info.pixel_format);
+            throw std::runtime_error("Unkown pixel format " + info.pixel_format);
 
         gst_structure_get_int(caps_structure, "width", &info.width);
         gst_structure_get_int(caps_structure, "height", &info.height);

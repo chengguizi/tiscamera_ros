@@ -61,7 +61,7 @@ void imageCallback(std::shared_ptr<TisCameraManager::FrameData> data){
         std::cout << datainfo.frame_count << "taken." << std::endl;
 
         cv::Mat OpenCVImage;
-        OpenCVImage.create( datainfo.height,datainfo.width,CV_16UC1);
+        OpenCVImage.create( datainfo.height,datainfo.width,CV_8UC3);
         memcpy( OpenCVImage.data, data->image_data(), datainfo.bytes_per_pixel* datainfo.height * datainfo.width);
         std::ostringstream filename;
 
@@ -84,7 +84,7 @@ int main(int argc, char **argv)
 {
     gst_init(&argc, &argv);
 
-    std::string camera_sn = "30914056"; //"30914056" "30914060"
+    std::string camera_sn = "13124301"; //"30914056" "30914060"
 
     cam = new TisCameraManager("snapcam",camera_sn);
 
@@ -95,18 +95,21 @@ int main(int argc, char **argv)
     cam->enable_video_display(gst_element_factory_make("xvimagesink", NULL)); // ximagesink
     
     // Set a color video format, resolution and frame rate
-    cam->set_capture_format("GRAY16_LE", FrameSize{1440,1080}, FrameRate{30,1});
+    cam->set_capture_format("BGR", FrameSize{1440,1080}, FrameRate{30,1});
     // cam.set_capture_format("GRAY16_LE", FrameSize{640,480}, FrameRate{30,1});
 
     // Start the camera
     cam->set_trigger_mode(TisCameraManager::NONE);
     cam->set_exposure_gain_auto(false);
-    cam->set_exposure_time(3000); // in us
+    cam->set_exposure_time(30000); // in us
     cam->set_gain(0);
 
+    // this will fail
     // cam->set_tonemapping_mode(true);
 
     cam->start();
+
+    cam->set_tonemapping_mode(true);
 
     ListProperties(*cam);
 
@@ -117,7 +120,7 @@ int main(int argc, char **argv)
     // char dummyvalue;
 
     while(true){
-        // printf("Press space key to take Snap.\n");
+        printf("Press space key to take Snap.\n");
         std::cin.get();
 
         take_next = true;

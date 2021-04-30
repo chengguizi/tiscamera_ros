@@ -289,6 +289,7 @@ TcamCamera::create_pipeline()
     pipeline_ = gst_pipeline_new(pipeline_name.c_str());
     std::cout << "pipeline created with name: " << pipeline_name << std::endl;
     tcambin_ = gst_element_factory_make("tcambin", nullptr);
+    g_object_set(tcambin_, "use-dutils", true, nullptr);
     if (!tcambin_)
         throw std::runtime_error("'tcambin' could not be initialized! Check tiscamera installation");
     capturecapsfilter_ = gst_element_factory_make("capsfilter", nullptr);
@@ -456,7 +457,7 @@ TcamCamera::get_property(std::string name)
 
     if (!ret)
     {
-        throw std::runtime_error("Failed to query property");
+        throw std::runtime_error("Failed to query property " + name);
     }
     std::shared_ptr<Property> prop;
     const char *t = g_value_get_string(&type);
@@ -563,26 +564,26 @@ TcamCamera::set_capture_format(std::string format, FrameSize size, FrameRate fra
     if(format != "")
         gst_caps_set_simple(caps, "format", G_TYPE_STRING, format.c_str(), nullptr);    
 
-    if(!is_playing)
-    {
-        std::cout << "set_capture_format: set caps while not playing..." << std::endl;
-        g_object_set(tcambin_, "device-caps", gst_caps_to_string(caps), nullptr);
-    }
-    else
-    {
-        std::cout << "set_capture_format: set caps while not PLAYING..." << std::endl;
-        GstElement *src = gst_bin_get_by_name(GST_BIN(tcambin_), "tcambin-src_caps");
-        assert(src);
-        g_object_set(src, "caps", caps, nullptr);
-        gst_object_unref(src);
-    }
+    // if(!is_playing)
+    // {
+    //     std::cout << "set_capture_format: set caps while not playing..." << std::endl;
+    //     g_object_set(tcambin_, "device-caps", gst_caps_to_string(caps), nullptr);
+    // }
+    // else
+    // {
+    //     std::cout << "set_capture_format: set caps while not PLAYING..." << std::endl;
+    //     GstElement *src = gst_bin_get_by_name(GST_BIN(tcambin_), "tcambin-src_caps");
+    //     assert(src);
+    //     g_object_set(src, "caps", caps, nullptr);
+    //     gst_object_unref(src);
+    // }
     
 
     //// not working: device-caps is only queried upon GST_STATE_CHANGE_READY_TO_PAUSED
     // g_object_set(tcambin_, "device-caps", gst_caps_to_string(caps), nullptr);
     
     // this change is not working for changing resolution
-    // g_object_set(G_OBJECT(capturecapsfilter_), "caps", caps, nullptr);
+    g_object_set(G_OBJECT(capturecapsfilter_), "caps", caps, nullptr);
     gst_caps_unref(caps);
 
     // GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN(pipeline_),

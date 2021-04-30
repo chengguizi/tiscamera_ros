@@ -171,14 +171,29 @@ inline void publish_image(std::shared_ptr<TisCameraManager::FrameData> frame, si
 {
 
     assert(frame->initialised());
+    assert(_camera_pub[index] != nullptr);
 
     auto info = frame->get_info();
 
-    auto image_cv = cv::Mat(cv::Size(info.width, info.height), CV_16UC1, (void *)frame->image_data(), cv::Mat::AUTO_STEP);
+    cv::Mat image_cv;
 
-    assert(_camera_pub[index] != nullptr);
+    if (info.pixel_format == "GRAY16_LE"){
+        image_cv = cv::Mat(cv::Size(info.width, info.height), CV_16UC1, (void *)frame->image_data(), cv::Mat::AUTO_STEP);
+        _camera_pub[index]->publish(image_cv, "mono16", CameraParam::list[index]->camera_info, ros::Time().fromNSec(trigger_time));
+    } 
+    else if (info.pixel_format == "BGR"){
+        image_cv = cv::Mat(cv::Size(info.width, info.height), CV_8UC3, (void *)frame->image_data(), cv::Mat::AUTO_STEP);
+        _camera_pub[index]->publish(image_cv, "bgr8", CameraParam::list[index]->camera_info, ros::Time().fromNSec(trigger_time));
+    }
+    else{
+        std::cout << info.pixel_format << std::endl;
+        throw std::runtime_error("Unknown type for CV to publish");
+    }
+        
 
-    _camera_pub[index]->publish(image_cv, "mono16", CameraParam::list[index]->camera_info, ros::Time().fromNSec(trigger_time));
+    
+
+    
 }
 
 void callbackIndividual_handler(std::shared_ptr<TisCameraManager::FrameData> data, const size_t index)
@@ -211,9 +226,9 @@ void start_camera(std::unique_ptr<TisCameraManager>& camera, const CameraParam& 
     
     // std::cout << "Enable Display" << std::endl;
     // camera->enable_video_display(gst_element_factory_make("ximagesink", NULL));
-    std::cout << "Setting Capture Format..." << std::endl;
+    std::cout << "Setting Capture Format to " << param.format << std::endl;
     // camera->set_capture_format("GRAY16_LE", gsttcam::FrameSize{1440,1080}, gsttcam::FrameRate{30,1});
-    camera->set_capture_format("GRAY16_LE", gsttcam::FrameSize{param.width,param.height}, gsttcam::FrameRate{param.gst_max_frame_rate,1}); // {1440,1080}
+    camera->set_capture_format(param.format, gsttcam::FrameSize{param.width,param.height}, gsttcam::FrameRate{param.gst_max_frame_rate,1}); // {1440,1080}
     
     camera->set_imx_low_latency_mode(true);
 
