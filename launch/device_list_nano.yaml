@@ -1,0 +1,34 @@
+devices:
+  - fisheye_l
+  - fisheye_bl
+  - fisheye_br
+
+fisheye_l:
+  type: 37UX273_ML
+  sn: '13124313'
+  exposure_mode: internal # manual, internal
+  tonemapping_mode: internal # none, internal, custom
+  tonemapping_intensity: 6 # [-8,8]
+  tonemapping_global_brightness: 0.1 # [0,1]
+  highlight_reduction: false
+  hardware_sync_mode: none # master, slave, none
+
+fisheye_bl:
+  type: 37UX273_ML
+  sn: '13124307'
+  exposure_mode: internal # manual, internal
+  tonemapping_mode: internal
+  tonemapping_intensity: 6 # [-8,8]
+  tonemapping_global_brightness: 0.1 # [0,1]
+  highlight_reduction: false
+  hardware_sync_mode: none
+
+fisheye_br:
+  type: 37UX273_ML
+  sn: '13124297'
+  exposure_mode: internal # manual, internal
+  tonemapping_mode: internal
+  tonemapping_intensity: 6 # [-8,8]
+  tonemapping_global_brightness: 0.1 # [0,1]
+  highlight_reduction: false
+  hardware_sync_mode: none
