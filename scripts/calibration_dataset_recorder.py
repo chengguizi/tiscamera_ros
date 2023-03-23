@@ -170,6 +170,7 @@ class RosbagDatasetRecorder:
             # force time alignment
             if stamp is None:
                 stamp = imageMsg.header.stamp
+            imageMsg.header.stamp = stamp
             # imgMsg, stamp = self.ecal2ros_image(imageMsg)
             self.bag.write(imageName, imageMsg, stamp)
 
